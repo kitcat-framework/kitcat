@@ -23,7 +23,7 @@ type Config struct {
 
 	// Below is almost a copy of the http.Server struct
 
-	// DisableGeneralOptionsHandler, if true, passes "OPTIONS *" requests to the Handler,
+	// DisableGeneralOptionsHandler, if true, passes "OPTIONS *" requests to the CustomHandler,
 	// otherwise responds with 200 OK and Content-Length: 0.
 	DisableGeneralOptionsHandler bool
 
@@ -48,7 +48,7 @@ type Config struct {
 
 	// ReadHeaderTimeout is the amount of time allowed to read
 	// request headers. The connection's read deadline is reset
-	// after reading the headers and the Handler can decide what
+	// after reading the headers and the CustomHandler can decide what
 	// is considered too slow for the body. If ReadHeaderTimeout
 	// is zero, the value of ReadTimeout is used. If both are
 	// zero, there is no timeout.
@@ -95,8 +95,8 @@ type Module struct {
 }
 
 // New returns a new Web
-func New(config *Config) func() *Module {
-	return func() *Module {
+func New(config *Config) func(a *kitcat.App) {
+	return func(a *kitcat.App) {
 		w := &Module{
 			config: config,
 			logger: slog.With(kitslog.Module("kitweb")),
@@ -110,16 +110,17 @@ func New(config *Config) func() *Module {
 		w.paramsBinder = httpbind.NewBinder(stringExtractors, valueExtractors)
 		w.paramsValidator = GetValidator(w.paramsBinder.GetParsableTags())
 
-		return w
+		a.Provides(
+			w,
+			kitcat.ModuleAnnotation(w),
+			w.config,
+			w.router,
+		)
 	}
 }
 
 func (w *Module) OnStart(_ context.Context, app *kitcat.App) error {
 	w.setTemplateEngine(app)
-
-	app.Provide(func() *Config { return w.config })
-	app.Provide(func() *Router { return w.router })
-
 	w.httpServer = w.buildHTPServerFromConfig()
 
 	addr := w.config.Addr
@@ -196,4 +197,10 @@ func (w *Module) setTemplateEngine(app *kitcat.App) {
 
 		return nil
 	})
+}
+
+func (w *Module) registerHandlers(handlers handlers) {
+	for _, h := range handlers.Handlers {
+		h.Routes(w.router)
+	}
 }

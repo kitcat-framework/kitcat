@@ -2,6 +2,7 @@ package kitmail
 
 import (
 	"github.com/expectedsh/dig"
+	"github.com/expectedsh/kitcat/kitdi"
 	jemail "github.com/jordan-wright/email"
 )
 
@@ -19,13 +20,8 @@ type (
 		dig.In
 		Senders []Sender `group:"kitmail.sender"`
 	}
-
-	ProvidableSender struct {
-		dig.Out
-		Sender Sender `group:"kitmail.sender"`
-	}
 )
 
-func NewProvidableSender(sender Sender) ProvidableSender {
-	return ProvidableSender{Sender: sender}
+func SenderAnnotation(sender any) *kitdi.Annotation {
+	return kitdi.Annotate(sender, kitdi.Group("kitmail.sender"), kitdi.As(new(Sender)))
 }

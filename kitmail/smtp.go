@@ -12,13 +12,13 @@ type SmtpSender struct {
 	logger *slog.Logger
 }
 
-func NewSmtpSender(config *Config, logger *slog.Logger) ProvidableSender {
-	return NewProvidableSender(&SmtpSender{
+func NewSmtpSender(config *Config, logger *slog.Logger) *SmtpSender {
+	return &SmtpSender{
 		Config: config,
 		logger: logger.With(
 			kitslog.Module("kitmail"),
 			slog.String("sender", "in_memory")),
-	})
+	}
 }
 
 func (s *SmtpSender) Send(e Email) error {

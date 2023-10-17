@@ -41,7 +41,7 @@ type GoHTMLEngine struct {
 	layoutTemplates map[string]*template.Template
 }
 
-func NewGoHTMLTemplateEngine(config *GoHTMLEngineConfig) (ProvidableEngine, error) {
+func NewGoHTMLTemplateEngine(config *GoHTMLEngineConfig) (*GoHTMLEngine, error) {
 	p := &GoHTMLEngine{
 		GoHTMLEngineConfig: config,
 		layoutTemplates:    make(map[string]*template.Template),
@@ -49,13 +49,13 @@ func NewGoHTMLTemplateEngine(config *GoHTMLEngineConfig) (ProvidableEngine, erro
 	}
 
 	if err := p.init(); err != nil {
-		return ProvidableEngine{}, err
+		return nil, err
 	}
 
-	return NewProvidableEngine(p), nil
+	return p, nil
 }
 
-func (p *GoHTMLEngine) Execute(writer io.Writer, name string, applyOptions ...EngineOptsApplier) error {
+func (p *GoHTMLEngine) Execute(writer io.Writer, name string, applyOptions ...EngineOption) error {
 	opts := EngineOptions{}
 	for _, applyOpt := range applyOptions {
 		applyOpt(&opts)

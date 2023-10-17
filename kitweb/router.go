@@ -88,9 +88,9 @@ type HTTPHandler interface {
 	ServeHTTP(provider *Module) http.HandlerFunc
 }
 
-type Handler[P any] func(r *Req[P]) Res
+type CustomHandler[P any] func(r *Req[P]) Res
 
-func (h Handler[P]) ServeHTTP(module *Module) http.HandlerFunc {
+func (h CustomHandler[P]) ServeHTTP(module *Module) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		request := newRequest[P](r, module.paramsBinder, module.paramsValidator)
 		response := h(request)

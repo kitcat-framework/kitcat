@@ -16,48 +16,49 @@ type Config struct {
 }
 
 type Module struct {
-	Config *Config
+	Config           *Config
+	availableSenders []Sender
 
 	CurrentSender Sender
 }
 
-func New(config *Config) func() *Module {
-	return func() *Module {
-		return &Module{
+func New(config *Config) func(app *kitcat.App) {
+	return func(app *kitcat.App) {
+		mod := &Module{
 			Config: config,
 		}
+
+		app.Provides(
+			mod,
+			kitcat.ConfigurableAnnotation(mod),
+			SenderAnnotation(NewSmtpSender),
+			config,
+		)
 	}
 }
 
-func (m *Module) OnStart(_ context.Context, app *kitcat.App) error {
-	app.Provides(
-		func() *Config { return m.Config },
-		NewSmtpSender,
-	)
-
-	app.Invoke(m.useSender)
+func (m *Module) Configure(_ context.Context, app *kitcat.App) error {
+	app.Invoke(m.setCurrentSender)
 
 	return nil
 }
 
-func (m *Module) useSender(a *kitcat.App, s senders) error {
+func (m *Module) Priority() uint8 { return 0 }
+
+func (m *Module) setCurrentSender(a *kitcat.App, s senders) error {
 	implementation, err := kitcat.UseImplementation(kitcat.UseImplementationParams[Sender]{
 		ModuleName:                m.Name(),
 		ImplementationTerminology: "sender",
 		ConfigImplementationName:  m.Config.SenderName,
-		Implementations:           s.Senders,
+		Implementations:           m.availableSenders,
 	})
 	if err != nil {
 		return err
 	}
 
 	m.CurrentSender = implementation
-	a.Provide(func() Sender { return implementation })
+	a.Provides(m.CurrentSender)
 
-	return nil
-}
-
-func (m *Module) OnStop(_ context.Context, app *kitcat.App) error {
 	return nil
 }
 

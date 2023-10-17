@@ -3,13 +3,14 @@ package kitevent
 import (
 	"context"
 	"github.com/expectedsh/kitcat"
+	"github.com/expectedsh/kitcat/kitdi"
 	"github.com/expectedsh/kitcat/kitslog"
 	"log/slog"
 	"reflect"
 )
 
 type Config struct {
-	StoreName string `env:"KITEVENT_STORE_NAME"`
+	StoreName string `env:"KITEVENT_STORE_NAME" envDefault:"in-memory"`
 }
 
 type Module struct {
@@ -19,20 +20,30 @@ type Module struct {
 	CurrentStore Store
 }
 
-func New(config *Config) func() kitcat.ProvidableModule {
-	return func() kitcat.ProvidableModule {
-		return kitcat.NewProvidableModule(&Module{
+func New(config *Config) func(a *kitcat.App) {
+	return func(a *kitcat.App) {
+		mod := &Module{
 			config: config,
 			logger: slog.With(kitslog.Module("kitevent")),
-		})
+		}
+		a.Provides(
+			mod,
+			kitcat.ModuleAnnotation(mod),
+			StoreAnnotation(NewInMemoryEventStore),
+			config,
+		)
 	}
 }
 
-func (m *Module) OnStart(_ context.Context, app *kitcat.App) error {
-	app.Provide(func() *Config { return m.config })
-	app.Provides(NewInMemoryEventStore)
+func (m *Module) Configure(_ context.Context, app *kitcat.App) error {
+	app.Invoke(m.setCurrentStore)
 
-	app.Invoke(m.useStores)
+	return nil
+}
+
+func (m *Module) Priority() uint8 { return 0 }
+
+func (m *Module) OnStart(_ context.Context, app *kitcat.App) error {
 	app.Invoke(m.useHandlers)
 
 	return m.CurrentStore.OnStart()
@@ -58,7 +69,7 @@ func (m *Module) useHandlers(h handlers) error {
 	return nil
 }
 
-func (m *Module) useStores(app *kitcat.App, st stores) error {
+func (m *Module) setCurrentStore(app *kitcat.App, st stores) error {
 	store, err := kitcat.UseImplementation(kitcat.UseImplementationParams[Store]{
 		ModuleName:                m.Name(),
 		ImplementationTerminology: "store",
@@ -70,7 +81,8 @@ func (m *Module) useStores(app *kitcat.App, st stores) error {
 	}
 
 	m.CurrentStore = store
-	app.Provide(func() Producer { return store })
+
+	app.Provides(kitdi.Annotate(store, kitdi.As(new(Producer))))
 
 	return nil
 }

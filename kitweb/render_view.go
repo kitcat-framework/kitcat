@@ -72,7 +72,7 @@ func (r RenderData) Error() (*Error, bool) {
 func (r *RenderViewBuilder) Write(ctx context.Context, w http.ResponseWriter) error {
 	engine := ctx.Value(ctxKeyEnginesValue).(map[string]kittemplate.Engine)[r.engine]
 
-	opts := make([]kittemplate.EngineOptsApplier, 0)
+	opts := make([]kittemplate.EngineOption, 0)
 	if r.layout != nil {
 		opts = append(opts, kittemplate.WithEngineOptLayout(*r.layout))
 	}

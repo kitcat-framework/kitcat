@@ -4,6 +4,7 @@ import (
 	"context"
 	"github.com/expectedsh/dig"
 	"github.com/expectedsh/kitcat"
+	"github.com/expectedsh/kitcat/kitdi"
 )
 
 type (
@@ -39,19 +40,9 @@ type (
 		Stores []Store `group:"kitevent.store"`
 	}
 
-	ProvidableStore struct {
-		dig.Out
-		Store Store `group:"kitevent.store"`
-	}
-
 	handlers struct {
 		dig.In
 		Handlers []kitcat.Nameable `group:"kitevent.handler"`
-	}
-
-	ProvidableHandler struct {
-		dig.Out
-		Handler kitcat.Nameable `group:"kitevent.handler"`
 	}
 )
 
@@ -61,10 +52,10 @@ func NewEventName(name string) EventName {
 	}
 }
 
-func NewProvidableStore(store Store) ProvidableStore {
-	return ProvidableStore{Store: store}
+func EventHandlerAnnotation(handler any) *kitdi.Annotation {
+	return kitdi.Annotate(handler, kitdi.Group("kitevent.handler"), kitdi.As(new(kitcat.Nameable)))
 }
 
-func NewProvidableHandler(handler kitcat.Nameable) ProvidableHandler {
-	return ProvidableHandler{Handler: handler}
+func StoreAnnotation(store any) *kitdi.Annotation {
+	return kitdi.Annotate(store, kitdi.Group("kitevent.store"), kitdi.As(new(Store)))
 }

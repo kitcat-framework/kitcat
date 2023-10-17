@@ -12,13 +12,13 @@ type InMemoryEventStore struct {
 	logger    *slog.Logger
 }
 
-func NewInMemoryEventStore(logger *slog.Logger) ProvidableStore {
-	return NewProvidableStore(&InMemoryEventStore{
+func NewInMemoryEventStore(logger *slog.Logger) *InMemoryEventStore {
+	return &InMemoryEventStore{
 		listeners: make(map[EventName][]kitcat.Nameable),
 		logger: logger.With(
 			kitslog.Module("kitevent"),
-			slog.String("store", "in_memory")),
-	})
+			slog.String("store", "in-memory")),
+	}
 }
 
 func (p *InMemoryEventStore) AddEventHandler(eventName EventName, listener kitcat.Nameable) {
@@ -45,7 +45,7 @@ func (p *InMemoryEventStore) ProduceNow(ctx context.Context, event Event) error 
 }
 
 func (p *InMemoryEventStore) Name() string {
-	return "in_memory"
+	return "in-memory"
 }
 
 func (p *InMemoryEventStore) OnStart() error {

@@ -1,9 +1,9 @@
 package kitweb
 
 type ErrorDescription struct {
-	Code    string
-	Message string
-	Meta    map[string]any
+	Code    string         `json:"code"`
+	Message string         `json:"message"`
+	Meta    map[string]any `json:"meta,omitempty"`
 }
 
 type Error struct {
@@ -39,8 +39,8 @@ func BadRequestError(err error) *Error {
 // ValidationError is a dedicated error for validation errors where
 // the error can be displayed to the end user with the field name
 type ValidationError struct {
-	Errors map[string]*Error
-	Global *Error
+	Errors map[string]*Error `json:"errors"`
+	Global *Error            `json:"global,omitempty"`
 
 	error
 }

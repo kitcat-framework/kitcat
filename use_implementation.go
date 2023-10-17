@@ -5,10 +5,6 @@ import (
 	"strings"
 )
 
-type Nameable interface {
-	Name() string
-}
-
 type UseImplementationParams[T Nameable] struct {
 	ModuleName                string
 	ImplementationTerminology string
