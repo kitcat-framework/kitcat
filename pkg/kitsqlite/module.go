@@ -1,4 +1,4 @@
-package kitpg
+package kitsqlite
 
 import (
 	"context"
