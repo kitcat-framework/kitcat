@@ -9,6 +9,7 @@ import (
 	"gorm.io/gorm"
 	"gorm.io/gorm/logger"
 	"math"
+	"net/url"
 )
 
 type Config struct {
@@ -59,7 +60,7 @@ func (m *Module) Configure(_ context.Context, app *kitcat.App) error {
 		gc.Logger = logger.Default.LogMode(logger.LogLevel(m.config.LogLevel))
 	}
 
-	db, err := gorm.Open(sqlite.Open(m.config.File), m.config.GormConfig)
+	db, err := gorm.Open(sqlite.Open(m.config.File), gc)
 	if err != nil {
 		return err
 	}
@@ -77,4 +78,8 @@ func (m *Module) Priority() uint8 { return math.MaxUint8 }
 
 func (m *Module) Name() string {
 	return "kitsqlite"
+}
+
+func (c Config) DSN(_ url.Values) (dsn string) {
+	return fmt.Sprintf("sqlite://%s", c.File)
 }

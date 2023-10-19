@@ -43,53 +43,18 @@ func New(cfg *Config) *App {
 }
 
 func (a *App) Run() {
-	err := a.container.Invoke(func(m configurables) {
-		slog.Info("configuring modules", slog.Int("count", len(m.Configurables)))
-		cancelFuncs := make([]context.CancelFunc, 0, len(m.Configurables))
+	mesureStart := time.Now()
 
-		// sort for high (number) priority first
-		slices.SortFunc(m.Configurables, func(a, b Configurable) int {
-			return int(b.Priority()) - int(a.Priority())
-		})
+	a.configureModules()
+	a.startModules()
 
-		for _, adaptable := range m.Configurables {
-			timeoutCtx, cancelFunc := context.WithTimeout(context.Background(), a.config.HooksMaxLifetime)
-			cancelFuncs = append(cancelFuncs, cancelFunc)
-			slog.Info("configuring module", kitslog.Module(adaptable.Name()))
-			if err := adaptable.Configure(timeoutCtx, a); err != nil {
-				kitexit.Abnormal(fmt.Errorf("kitcat: error while configuring module %s: %w", adaptable.Name(), err))
-			}
+	slog.Info("kitcat: started", slog.Duration("elapsed_time", time.Since(mesureStart)))
+
+	if a.config.Environment.Equal(Development) {
+		f, err := os.Create("dig.dot")
+		if err == nil {
+			_ = dig.Visualize(a.container, f)
 		}
-
-		for _, cancelFunc := range cancelFuncs {
-			cancelFunc()
-		}
-	})
-	if err != nil {
-		kitexit.Abnormal(fmt.Errorf("kitcat: error while configuring modules: %w", err))
-		return
-	}
-
-	err = a.container.Invoke(func(m modules) {
-		slog.Info("starting modules", slog.Int("count", len(m.Modules)))
-		cancelFuncs := make([]context.CancelFunc, 0, len(m.Modules))
-		for _, mod := range m.Modules {
-			timeoutCtx, cancelFunc := context.WithTimeout(context.Background(), a.config.HooksMaxLifetime)
-			cancelFuncs = append(cancelFuncs, cancelFunc)
-			slog.Info("start module", kitslog.Module(mod.Name()))
-			if err := mod.OnStart(timeoutCtx, a); err != nil {
-				kitexit.Abnormal(fmt.Errorf("kitcat: error while starting module %s: %w", mod.Name(), err))
-			}
-		}
-
-		for _, cancelFunc := range cancelFuncs {
-			cancelFunc()
-		}
-	})
-
-	if err != nil {
-		kitexit.Abnormal(fmt.Errorf("kitcat: error while starting modules: %w", err))
-		return
 	}
 
 	stopChan := make(chan os.Signal, 1)
@@ -97,6 +62,13 @@ func (a *App) Run() {
 
 	<-stopChan
 
+	a.stopModules()
+
+	slog.Info("kitcat: graceful shutdown")
+	os.Exit(0)
+}
+
+func (a *App) stopModules() {
 	a.Invoke(func(m modules) error {
 		slog.Info("stopping modules", slog.Int("count", len(m.Modules)))
 		cancelFuncs := make([]context.CancelFunc, 0, len(m.Modules))
@@ -104,7 +76,7 @@ func (a *App) Run() {
 			timeoutCtx, cancelFunc := context.WithTimeout(context.Background(), a.config.HooksMaxLifetime)
 			cancelFuncs = append(cancelFuncs, cancelFunc)
 
-			slog.Info("stop module", kitslog.Module(mod.Name()))
+			slog.Debug("stop module", kitslog.Module(mod.Name()))
 			if err := mod.OnStop(timeoutCtx, a); err != nil {
 				return fmt.Errorf("kitcat: error while stopping module %s: %w", mod.Name(), err)
 			}
@@ -116,9 +88,50 @@ func (a *App) Run() {
 
 		return nil
 	})
+}
 
-	slog.Info("kitcat: graceful shutdown")
-	os.Exit(0)
+func (a *App) startModules() {
+	a.Invoke(func(m modules) {
+		slog.Info("starting modules", slog.Int("count", len(m.Modules)))
+		cancelFuncs := make([]context.CancelFunc, 0, len(m.Modules))
+		for _, mod := range m.Modules {
+			timeoutCtx, cancelFunc := context.WithTimeout(context.Background(), a.config.HooksMaxLifetime)
+			cancelFuncs = append(cancelFuncs, cancelFunc)
+			slog.Debug("start module", kitslog.Module(mod.Name()))
+			if err := mod.OnStart(timeoutCtx, a); err != nil {
+				kitexit.Abnormal(fmt.Errorf("kitcat: error while starting module %s: %w", mod.Name(), err))
+			}
+		}
+
+		for _, cancelFunc := range cancelFuncs {
+			cancelFunc()
+		}
+	})
+}
+
+func (a *App) configureModules() {
+	a.Invoke(func(m configurables) {
+		slog.Info("configuring modules", slog.Int("count", len(m.Configurables)))
+		cancelFuncs := make([]context.CancelFunc, 0, len(m.Configurables))
+
+		// sort for high (number) priority first
+		slices.SortFunc(m.Configurables, func(a, b Configurable) int {
+			return int(b.Priority()) - int(a.Priority())
+		})
+
+		for _, adaptable := range m.Configurables {
+			timeoutCtx, cancelFunc := context.WithTimeout(context.Background(), a.config.HooksMaxLifetime)
+			cancelFuncs = append(cancelFuncs, cancelFunc)
+			slog.Debug("configuring module", kitslog.Module(adaptable.Name()))
+			if err := adaptable.Configure(timeoutCtx, a); err != nil {
+				kitexit.Abnormal(fmt.Errorf("kitcat: error while configuring module %s: %w", adaptable.Name(), err))
+			}
+		}
+
+		for _, cancelFunc := range cancelFuncs {
+			cancelFunc()
+		}
+	})
 }
 
 func (a *App) Provides(constructors ...any) {

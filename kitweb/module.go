@@ -200,7 +200,13 @@ func (w *Module) setTemplateEngine(app *kitcat.App) {
 }
 
 func (w *Module) registerHandlers(handlers handlers) {
+	if len(handlers.Handlers) == 0 {
+		return
+	}
+
+	w.logger.Info("registering handlers", slog.Int("count", len(handlers.Handlers)))
 	for _, h := range handlers.Handlers {
+		w.logger.Info("registering handler", slog.String("handler", h.Name()))
 		h.Routes(w.router)
 	}
 }

@@ -3,6 +3,9 @@ package kitmail
 import (
 	"context"
 	"github.com/expectedsh/kitcat"
+	"github.com/expectedsh/kitcat/kitdi"
+	"github.com/expectedsh/kitcat/kitslog"
+	"log/slog"
 )
 
 type Config struct {
@@ -12,20 +15,21 @@ type Config struct {
 	Username string `env:"SMTP_USERNAME"`
 	Password string `env:"SMTP_PASSWORD"`
 
-	SenderName string `env:"KITMAIL_SENDER_NAME"`
+	SenderName string `env:"KITMAIL_SENDER_NAME" envDefault:"smtp"`
 }
 
 type Module struct {
-	Config           *Config
-	availableSenders []Sender
+	Config *Config
 
 	CurrentSender Sender
+	logger        *slog.Logger
 }
 
 func New(config *Config) func(app *kitcat.App) {
 	return func(app *kitcat.App) {
 		mod := &Module{
 			Config: config,
+			logger: slog.With(kitslog.Module("kitmail")),
 		}
 
 		app.Provides(
@@ -50,14 +54,15 @@ func (m *Module) setCurrentSender(a *kitcat.App, s senders) error {
 		ModuleName:                m.Name(),
 		ImplementationTerminology: "sender",
 		ConfigImplementationName:  m.Config.SenderName,
-		Implementations:           m.availableSenders,
+		Implementations:           s.Senders,
 	})
 	if err != nil {
 		return err
 	}
 
 	m.CurrentSender = implementation
-	a.Provides(m.CurrentSender)
+	m.logger.Info("using sender", slog.String("sender", m.CurrentSender.Name()))
+	a.Provides(kitdi.Annotate(m.CurrentSender, kitdi.As(new(Sender))))
 
 	return nil
 }

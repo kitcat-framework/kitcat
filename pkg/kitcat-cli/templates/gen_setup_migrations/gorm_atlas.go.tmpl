@@ -1,0 +1,54 @@
+{{- /*gotype: github.com/expectedsh/kitcat/pkg/kitcat-cli/templates/gen_setup_migrations.AtlasParams */ -}}
+
+variable "driver" {
+  type = string
+  default = "{{ .Driver }}"
+}
+
+variable "url_local_database" {
+  type = string
+  default = "{{ .LocalDatabaseDSN }}"
+}
+
+locals {
+  dev_url = {
+    mysql = "docker://mysql/8/dev"
+    postgres = "docker://postgres/15"
+    sqlite = "sqlite://file::memory:?cache=shared"
+  }[var.driver]
+}
+
+data "external_schema" "gorm" {
+  program = [
+    "go",
+    "run",
+    "-mod=mod",
+    "./cmd/kitmigrate",
+  ]
+}
+
+env "gorm" {
+  src = data.external_schema.gorm.url
+  dev = local.dev_url
+  migration {
+    dir = "file://{{ .MigrationDir }}"
+  }
+  format {
+    migrate {
+      diff = '{{ .Diff }}'
+    }
+  }
+}
+
+env "local" {
+  url = var.url_local_database
+  dev = local.dev_url
+  migration {
+    dir = "file://{{ .MigrationDir }}"
+  }
+  format {
+    migrate {
+      diff = '{{ .Diff }}'
+    }
+  }
+}

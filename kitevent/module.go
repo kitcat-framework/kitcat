@@ -29,6 +29,7 @@ func New(config *Config) func(a *kitcat.App) {
 		a.Provides(
 			mod,
 			kitcat.ModuleAnnotation(mod),
+			kitcat.ConfigurableAnnotation(mod),
 			StoreAnnotation(NewInMemoryEventStore),
 			config,
 		)
@@ -44,12 +45,18 @@ func (m *Module) Configure(_ context.Context, app *kitcat.App) error {
 func (m *Module) Priority() uint8 { return 0 }
 
 func (m *Module) OnStart(_ context.Context, app *kitcat.App) error {
-	app.Invoke(m.useHandlers)
+	app.Invoke(m.registerHandlers)
 
 	return m.CurrentStore.OnStart()
 }
 
-func (m *Module) useHandlers(h handlers) error {
+func (m *Module) registerHandlers(h handlers) error {
+	if len(h.Handlers) == 0 {
+		return nil
+	}
+
+	m.logger.Info("registering handlers", slog.Int("count", len(h.Handlers)))
+
 	for _, handler := range h.Handlers {
 		if !IsHandler(handler) {
 			m.logger.Warn("invalid handler, must implement method Handle(context.Context, kitevent.Event)",
@@ -63,6 +70,9 @@ func (m *Module) useHandlers(h handlers) error {
 			Interface().(Event).
 			EventName()
 
+		m.logger.Info("registering handler",
+			slog.String("handler", handler.Name()),
+			slog.String("event", eventName.Name))
 		m.CurrentStore.AddEventHandler(eventName, handler)
 	}
 
@@ -80,6 +90,7 @@ func (m *Module) setCurrentStore(app *kitcat.App, st stores) error {
 		return err
 	}
 
+	m.logger.Info("using store", slog.String("store", store.Name()))
 	m.CurrentStore = store
 
 	app.Provides(kitdi.Annotate(store, kitdi.As(new(Producer))))

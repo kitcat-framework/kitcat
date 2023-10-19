@@ -148,4 +148,26 @@ func TestProvidableInvoke(t *testing.T) {
 
 	require.NoError(t, err)
 	require.True(t, ok)
+
+	t.Run("invokable that register annotation", func(t *testing.T) {
+		container := dig.New()
+		require.NoError(t, Supply(container).Apply(container))
+
+		invokable := func(c *dig.Container) {
+			require.NoError(t, Annotate(NewTest, Group("test")).Apply(c))
+		}
+
+		require.NoError(t, ProvidableInvoke(invokable).Apply(container))
+
+		type tests struct {
+			dig.In
+			Tests []*Test `group:"test"`
+		}
+
+		err := container.Invoke(func(tests tests) {
+			require.Len(t, tests.Tests, 1)
+		})
+
+		require.NoError(t, err)
+	})
 }

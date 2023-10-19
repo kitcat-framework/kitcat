@@ -9,6 +9,7 @@ import (
 	"gorm.io/gorm"
 	"gorm.io/gorm/logger"
 	"math"
+	"net/url"
 )
 
 type Config struct {
@@ -69,7 +70,7 @@ func (m *Module) Configure(_ context.Context, app *kitcat.App) error {
 		gc.Logger = logger.Default.LogMode(logger.LogLevel(m.config.LogLevel))
 	}
 
-	db, err := gorm.Open(postgres.Open(dsn), m.config.GormConfig)
+	db, err := gorm.Open(postgres.Open(dsn), gc)
 	if err != nil {
 		return err
 	}
@@ -87,4 +88,19 @@ func (m *Module) Priority() uint8 { return math.MaxUint8 }
 
 func (m *Module) Name() string {
 	return "kitpg"
+}
+
+func (c Config) DSN(queries url.Values) (dsn string) {
+	dsn = fmt.Sprintf(
+		"postgres://%s:%s@%s:%s/%s",
+		c.User, c.Password, c.Host, c.Port, c.Database,
+	)
+
+	queries.Set("sslmode", c.SSLMode)
+
+	if len(queries) > 0 {
+		dsn += "?" + queries.Encode()
+	}
+
+	return
 }

@@ -28,6 +28,10 @@ func (e *Environment) String() string {
 	return e.Name
 }
 
+func (e *Environment) Equal(development Environment) bool {
+	return e.Name == development.Name
+}
+
 var (
 	Development = Environment{Name: "development"}
 	Production  = Environment{Name: "production"}
