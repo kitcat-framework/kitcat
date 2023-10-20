@@ -42,7 +42,7 @@ func (r *RenderJSONBuilder) Write(_ context.Context, w http.ResponseWriter) erro
 		}
 	} else if errors.As(r.error, &err) {
 		response["error"] = err.Error()
-	} else {
+	} else if r.error != nil {
 		response["error"] = InternalError(r.error)
 	}
 
@@ -52,5 +52,5 @@ func (r *RenderJSONBuilder) Write(_ context.Context, w http.ResponseWriter) erro
 
 	r.baseRenderBuilder.write(w)
 
-	return json.NewEncoder(w).Encode(r.data)
+	return json.NewEncoder(w).Encode(response)
 }

@@ -14,6 +14,10 @@ func main() {
 		cli.Tree(commands.Generator,
 			cli.Tree(commands.GenSetupMigration),
 		),
+		cli.Tree(commands.Migrate,
+			cli.Tree(commands.MigrateApply),
+			cli.Tree(commands.MigrateDiff),
+		),
 	)
 
 	if err := cli.Run(os.Args[1:]); err != nil {
@@ -31,8 +35,6 @@ type rootT struct {
 
 var root = &cli.Command{
 	Desc: "kitcat-cli is a command line tool for kitcat framework",
-	// Argv is a factory function of argument object
-	// ctx.Argv() is if Command.Argv == nil or Command.Argv() is nil
 	Argv: func() any { return new(rootT) },
 	Fn: func(ctx *cli.Context) error {
 		return help.Run(ctx.Args())

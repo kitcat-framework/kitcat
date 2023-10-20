@@ -2,7 +2,6 @@ package commands
 
 import "github.com/mkideal/cli"
 
-// Generator command
 type generator struct {
 	cli.Helper
 }

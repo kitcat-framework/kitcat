@@ -13,9 +13,10 @@ type AtlasParams struct {
 	MigrationDir string
 	Diff         string
 	Driver       string
+	DSN          string
 }
 
-func NewAtlasParams(driver, migrationDir string) *AtlasParams {
+func NewAtlasParams(driver, migrationDir, dsn string) *AtlasParams {
 	driverToDev := map[string]string{
 		"sqlite":   "sqlite://file::memory:?cache=shared",
 		"mysql":    "docker://mysql/8/dev",
@@ -25,7 +26,8 @@ func NewAtlasParams(driver, migrationDir string) *AtlasParams {
 	return &AtlasParams{
 		Dev:          driverToDev[driver],
 		MigrationDir: migrationDir,
-		Diff:         "{{ sql . \"  \" }}",
+		Diff:         `{{ sql . \"  \" }}`,
 		Driver:       driver,
+		DSN:          dsn,
 	}
 }

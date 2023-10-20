@@ -8,17 +8,22 @@ import (
 	"github.com/expectedsh/kitcat/pkg/kitcat-cli/teacomponents"
 	"github.com/expectedsh/kitcat/pkg/kitcat-cli/templates/gen_setup_migrations"
 	"github.com/expectedsh/kitcat/pkg/kitcat-cli/utils"
+	"github.com/expectedsh/kitcat/pkg/kitpg"
 	"github.com/expectedsh/kitcat/pkg/kitsqlite"
+	"github.com/hashicorp/go-envparse"
 	"github.com/mkideal/cli"
+	"net/url"
+	"os"
 	"path"
 )
 
 type generateSetupMigrations struct {
 	cli.Helper
+	WithEnv
 
 	Driver    string `cli:"driver" usage:"driver (mysql, postgres, sqlite)" validate:"required,oneof=mysql postgres sqlite"`
 	Strategy  string `cli:"strategy" usage:"atlasgo strategy (golang-migrate, gorm)" validate:"oneof=golang-migrate gorm"`
-	Directory string `cli:"directory" usage:"directory where migrations will be stored" validate:"required"`
+	Directory string `cli:"migdir" usage:"directory where migrations will be stored" validate:"required"`
 	LocalDsn  string `cli:"dsn" usage:"dsn to connect to your database in local" validate:"required"`
 }
 
@@ -61,7 +66,7 @@ func genSetupMigrationFunc(m *generateSetupMigrations) error {
 func genSetupMigrationGorm(m *generateSetupMigrations) error {
 	fmt.Println()
 
-	params := gen_setup_migrations.NewAtlasParams(m.Driver, m.Directory)
+	params := gen_setup_migrations.NewAtlasParams(m.Driver, m.Directory, m.LocalDsn)
 
 	mainFile, err := utils.Template(gen_setup_migrations.GormMainFile, params)
 	if err != nil {
@@ -174,24 +179,72 @@ func genSetupMigrationQuestions(m *generateSetupMigrations) error {
 	}
 
 	if m.LocalDsn == "" {
-		p := tea.NewProgram(teacomponents.Input{
-			Question:  "We need a dsn to connect to your local database to then migrate it, we can inspect your env variables to find it :",
-			TextInput: teacomponents.NewTextInput(".env"),
-		})
+		if m.Env == "" {
+			p := tea.NewProgram(teacomponents.Input{
+				Question:  "We need a dsn to connect to your local database to then migrate it, we can inspect your env variables to find it :",
+				TextInput: teacomponents.NewTextInput(".env"),
+			})
 
-		run, err := p.Run()
-		if err != nil {
-			return err
+			run, _ := p.Run()
+
+			if c, ok := run.(teacomponents.Input); ok && c.TextInput.Value() != "" {
+				m.Env = c.TextInput.Value()
+			}
 		}
 
-		if c, ok := run.(teacomponents.Input); ok && c.TextInput.Value() != "" {
+		if m.Env == "" {
+			err := askDriverDSN(m)
+			if err != nil {
+				return err
+			}
+		} else {
+			type getDSN interface {
+				DSN(queries url.Values) (dsn string)
+			}
+
+			open, err := os.Open(m.Env)
+			if err != nil {
+				return err
+			}
+			parse, err := envparse.Parse(open)
+			if err != nil {
+				return err
+			}
+
+			for k, v := range parse {
+				_ = os.Setenv(k, v)
+			}
+
+			var dsn getDSN
 			switch m.Driver {
 			case "sqlite":
-				kitconfig.FromEnv[kitsqlite.Config]()
+				cfg := kitconfig.FromEnv[kitsqlite.Config]()
+				dsn = cfg
 			case "postgres":
+				cfg := kitconfig.FromEnv[kitpg.Config]()
+				dsn = cfg
 			}
+
+			m.LocalDsn = dsn.DSN(url.Values{})
 		}
 	}
 
+	return nil
+}
+
+func askDriverDSN(m *generateSetupMigrations) error {
+	p := tea.NewProgram(teacomponents.Input{
+		Question:  "So if you don't want to use your env variables, please enter your dsn :",
+		TextInput: teacomponents.NewTextInput(fmt.Sprintf("%s://", m.Driver)),
+	})
+
+	run, err := p.Run()
+	if err != nil {
+		return err
+	}
+
+	if c, ok := run.(teacomponents.Input); ok && c.TextInput.Value() != "" {
+		m.LocalDsn = c.TextInput.Value()
+	}
 	return nil
 }

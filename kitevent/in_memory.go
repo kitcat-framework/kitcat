@@ -5,6 +5,7 @@ import (
 	"github.com/expectedsh/kitcat"
 	"github.com/expectedsh/kitcat/kitslog"
 	"log/slog"
+	"time"
 )
 
 type InMemoryEventStore struct {
@@ -26,8 +27,38 @@ func (p *InMemoryEventStore) AddEventHandler(eventName EventName, listener kitca
 	p.listeners[eventName] = append(p.listeners[eventName], listener)
 }
 
-func (p *InMemoryEventStore) Produce(event Event) error {
-	return p.ProduceNow(context.Background(), event)
+func (p *InMemoryEventStore) Produce(event Event, opts ...ProduceOptionFn) error {
+	options := &ProduceOptions{}
+	for _, opt := range opts {
+		opt(options)
+	}
+
+	go func() {
+		if options != nil && options.ProduceAt.After(time.Now()) {
+			time.Sleep(time.Until(*options.ProduceAt))
+		}
+		retryCount := 0
+		for {
+			err := p.ProduceNow(context.Background(), event)
+			if err != nil {
+				p.logger.Error("unable to execute event",
+					kitslog.Err(err),
+					slog.String("event_name", event.EventName().Name),
+					slog.Int("retry_count", retryCount))
+			}
+
+			if options != nil && options.MaxRetry != nil {
+				if retryCount >= *options.MaxRetry {
+					return
+				}
+				retryCount++
+			} else {
+				return
+			}
+		}
+	}()
+
+	return nil
 }
 
 func (p *InMemoryEventStore) ProduceNow(ctx context.Context, event Event) error {

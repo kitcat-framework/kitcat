@@ -88,9 +88,9 @@ type HTTPHandler interface {
 	ServeHTTP(provider *Module) http.HandlerFunc
 }
 
-type CustomHandler[P any] func(r *Req[P]) Res
+type HandlerFunc[P any] func(r *Req[P]) Res
 
-func (h CustomHandler[P]) ServeHTTP(module *Module) http.HandlerFunc {
+func (h HandlerFunc[P]) ServeHTTP(module *Module) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		request := newRequest[P](r, module.paramsBinder, module.paramsValidator)
 		response := h(request)
@@ -111,8 +111,8 @@ func (r *Router) getHTTPHandler(handler any) (http.Handler, error) {
 	if value, ok := handler.(func(http.ResponseWriter, *http.Request)); ok {
 		handler = http.HandlerFunc(value)
 		return handler.(http.Handler), nil
-	} else if h, ok := handler.(HTTPHandler); !ok {
-		return h.ServeHTTP(r.webModule), nil
+	} else if value, ok := handler.(HTTPHandler); ok {
+		return value.ServeHTTP(r.webModule), nil
 	}
 
 	return nil, fmt.Errorf("invalid handler type: %s", reflect.TypeOf(handler).String())

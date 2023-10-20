@@ -66,7 +66,7 @@ func (m *Module) registerHandlers(h handlers) error {
 
 		eventName := reflect.New(reflect.ValueOf(handler).
 			MethodByName("Handle").
-			Type().In(1)).
+			Type().In(1).Elem()).
 			Interface().(Event).
 			EventName()
 

@@ -120,6 +120,7 @@ func New(config *Config) func(a *kitcat.App) {
 }
 
 func (w *Module) OnStart(_ context.Context, app *kitcat.App) error {
+	app.Invoke(w.registerHandlers)
 	w.setTemplateEngine(app)
 	w.httpServer = w.buildHTPServerFromConfig()
 

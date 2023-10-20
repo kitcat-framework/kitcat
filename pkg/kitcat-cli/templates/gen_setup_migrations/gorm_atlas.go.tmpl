@@ -7,7 +7,7 @@ variable "driver" {
 
 variable "url_local_database" {
   type = string
-  default = "{{ .LocalDatabaseDSN }}"
+  default = "{{ .DSN }}"
 }
 
 locals {
@@ -27,7 +27,7 @@ data "external_schema" "gorm" {
   ]
 }
 
-env "gorm" {
+env "gen_mig" {
   src = data.external_schema.gorm.url
   dev = local.dev_url
   migration {
@@ -35,12 +35,12 @@ env "gorm" {
   }
   format {
     migrate {
-      diff = '{{ .Diff }}'
+      diff = "{{ .Diff }}"
     }
   }
 }
 
-env "local" {
+env "apply_mig" {
   url = var.url_local_database
   dev = local.dev_url
   migration {
@@ -48,7 +48,7 @@ env "local" {
   }
   format {
     migrate {
-      diff = '{{ .Diff }}'
+      diff = "{{ .Diff }}"
     }
   }
 }
