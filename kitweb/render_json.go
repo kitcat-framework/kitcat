@@ -34,6 +34,7 @@ func (r *RenderJSONBuilder) Write(_ context.Context, w http.ResponseWriter) erro
 		ve  ValidationError
 		err Error
 	)
+
 	if errors.As(r.error, &ve) {
 		response["errors"] = ve.Errors
 
