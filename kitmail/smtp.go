@@ -22,11 +22,8 @@ func NewSmtpSender(config *Config, logger *slog.Logger) *SmtpSender {
 }
 
 func (s *SmtpSender) Send(e Email) error {
-	err := e.Send(fmt.Sprintf("%s:%d", s.Config.Host, s.Config.Port), smtp.PlainAuth(
-		s.Config.Identity,
-		s.Config.Username,
-		s.Config.Password,
-		s.Config.Host))
+	err := e.Send(fmt.Sprintf("%s:%d", s.Config.Host, s.Config.Port),
+		smtp.CRAMMD5Auth(s.Config.Username, s.Config.Password))
 	if err != nil {
 		return fmt.Errorf("kitmail: failed to send email: %w", err)
 	}

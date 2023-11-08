@@ -13,6 +13,7 @@ func main() {
 		cli.Tree(help),
 		cli.Tree(commands.Generator,
 			cli.Tree(commands.GenSetupMigration),
+			cli.Tree(commands.GenDockerCompose),
 		),
 		cli.Tree(commands.Migrate,
 			cli.Tree(commands.MigrateApply),
