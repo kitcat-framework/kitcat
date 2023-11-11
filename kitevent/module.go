@@ -44,10 +44,10 @@ func (m *Module) Configure(_ context.Context, app *kitcat.App) error {
 
 func (m *Module) Priority() uint8 { return 0 }
 
-func (m *Module) OnStart(_ context.Context, app *kitcat.App) error {
+func (m *Module) OnStart(ctx context.Context, app *kitcat.App) error {
 	app.Invoke(m.registerHandlers)
 
-	return m.CurrentStore.OnStart()
+	return m.CurrentStore.OnStart(ctx)
 }
 
 func (m *Module) registerHandlers(h handlers) error {
@@ -59,7 +59,7 @@ func (m *Module) registerHandlers(h handlers) error {
 
 	for _, handler := range h.Handlers {
 		if !IsHandler(handler) {
-			m.logger.Warn("invalid handler, must implement method Handle(context.Context, kitevent.Event)",
+			m.logger.Warn("invalid Handler, must implement method Handle(context.Context, kitevent.Event)",
 				slog.String("handler", reflect.TypeOf(handler).String()))
 			continue
 		}
@@ -80,6 +80,7 @@ func (m *Module) registerHandlers(h handlers) error {
 }
 
 func (m *Module) setCurrentStore(app *kitcat.App, st stores) error {
+	m.logger.Debug("stores", slog.Int("count", len(st.Stores)), slog.String("want", m.config.StoreName))
 	store, err := kitcat.UseImplementation(kitcat.UseImplementationParams[Store]{
 		ModuleName:                m.Name(),
 		ImplementationTerminology: "store",
@@ -98,8 +99,8 @@ func (m *Module) setCurrentStore(app *kitcat.App, st stores) error {
 	return nil
 }
 
-func (m *Module) OnStop(_ context.Context, _ *kitcat.App) error {
-	return m.CurrentStore.OnStop()
+func (m *Module) OnStop(ctx context.Context, _ *kitcat.App) error {
+	return m.CurrentStore.OnStop(ctx)
 }
 
 func (m *Module) Name() string {

@@ -2,6 +2,8 @@ package kitevent
 
 import (
 	"context"
+	"encoding/json"
+	"errors"
 	"github.com/expectedsh/kitcat"
 	"github.com/expectedsh/kitcat/kitreflect"
 	"github.com/expectedsh/kitcat/kitslog"
@@ -35,60 +37,96 @@ func IsHandler(handler kitcat.Nameable) bool {
 	return true
 }
 
+func PayloadToEvent(handler Handler, evt []byte) (Event, error) {
+	val := reflect.New(reflect.ValueOf(handler).
+		MethodByName("Handle").
+		Type().In(1).Elem())
+
+	err := json.Unmarshal(evt, val.Interface())
+	if err != nil {
+		return nil, err
+	}
+
+	event, ok := val.Interface().(Event)
+	if !ok {
+		return nil, errors.New("invalid event")
+	}
+
+	return event, nil
+
+}
+
 type CallHandlerParams struct {
-	ctx           context.Context
-	event         Event
-	producer      Producer
-	opts          *ProducerOptions
-	handler       Handler
-	logger        *slog.Logger
-	isProduceSync bool
+	Ctx     context.Context
+	Event   Event
+	Handler Handler
 }
 
 func CallHandler(p CallHandlerParams) error {
+	handleFunc := reflect.ValueOf(p.Handler).MethodByName("Handle")
+	ret := handleFunc.Call([]reflect.Value{reflect.ValueOf(p.Ctx), reflect.ValueOf(p.Event)})
+
+	if len(ret) > 0 && !ret[0].IsNil() {
+		return ret[0].Interface().(error)
+	}
+
+	return nil
+}
+
+type LocalCallHandlerParams struct {
+	Ctx           context.Context
+	Event         Event
+	Producer      Producer
+	Opts          *ProducerOptions
+	Handler       Handler
+	Logger        *slog.Logger
+	IsProduceSync bool
+}
+
+func LocalCallHandler(p LocalCallHandlerParams) error {
 	produceAgain := func() error {
-		if p.handler.Options().RetryInterval != nil {
-			p.opts.WithProduceAt(time.Now().Add(*p.handler.Options().RetryInterval))
+		if p.Handler.Options().RetryInterval != nil {
+			p.Opts.WithProduceAt(time.Now().Add(*p.Handler.Options().RetryInterval))
 		}
 
-		if p.isProduceSync {
-			return p.producer.ProduceSync(p.ctx, p.event, p.opts)
+		if p.IsProduceSync {
+			return p.Producer.ProduceSync(p.Ctx, p.Event, p.Opts)
 		} else {
-			return p.producer.Produce(p.ctx, p.event, p.opts)
+			return p.Producer.Produce(p.Ctx, p.Event, p.Opts)
 		}
 	}
 
-	handleFunc := reflect.ValueOf(p.handler).MethodByName("Handle")
-	ret := handleFunc.Call([]reflect.Value{reflect.ValueOf(p.ctx), reflect.ValueOf(p.event)})
+	handleFunc := reflect.ValueOf(p.Handler).MethodByName("Handle")
+	ret := handleFunc.Call([]reflect.Value{reflect.ValueOf(p.Ctx), reflect.ValueOf(p.Event)})
 
 	if len(ret) > 0 && !ret[0].IsNil() {
 		err := ret[0].Interface().(error)
 
-		sl := slog.With(kitslog.Err(err), slog.String("event_name", p.event.EventName().Name))
+		sl := slog.With(kitslog.Err(err), slog.String("event_name", p.Event.EventName().Name))
 
-		if err != nil && p.handler.Options().MaxRetry != nil {
-			maxRetry := *p.handler.Options().MaxRetry
-			retryCount := p.opts.RetryCount
+		if err != nil && p.Handler.Options().MaxRetries != nil {
+			maxRetry := *p.Handler.Options().MaxRetries
+			retryCount := p.Opts.RetryCount
 
 			if retryCount < maxRetry {
-				sl.Error("will retry event because handler gets an error",
-					slog.Int("current_retry_count", retryCount),
-					slog.Int("max_retry", maxRetry),
+				sl.Error("will retry Event because Handler gets an error",
+					slog.Int("current_retry_count", int(retryCount)),
+					slog.Int("max_retry", int(maxRetry)),
 				)
 
-				p.opts.RetryCount += 1
+				p.Opts.RetryCount += 1
 
 				return produceAgain()
 			} else {
-				sl.Error("unable to execute event, reached max retry",
-					slog.Int("retry_count", retryCount),
-					slog.Int("max_retry", maxRetry),
+				sl.Error("unable to execute Event, reached max retry",
+					slog.Int("retry_count", int(retryCount)),
+					slog.Int("max_retry", int(maxRetry)),
 				)
 				return err
 			}
 		}
 
-		sl.Error("an error occured")
+		sl.Error("an error occurred")
 
 		return err
 	}
