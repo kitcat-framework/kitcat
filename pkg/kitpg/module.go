@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"github.com/expectedsh/kitcat"
 	"github.com/expectedsh/kitcat/kitdi"
+	"github.com/expectedsh/kitcat/kitevent"
+	"github.com/expectedsh/kitcat/pkg/kitpg/kiteventpg"
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
 	"gorm.io/gorm/logger"
@@ -23,6 +25,8 @@ type Config struct {
 
 	GormConfig *gorm.Config
 
+	PostgresEventStoreConfig kiteventpg.PostgresEventStoreConfig
+
 	ConnectionName *string `env:"POSTGRES_CONNECTION_NAME"`
 }
 
@@ -37,6 +41,8 @@ func New(config *Config) func(a *kitcat.App) {
 
 		app.Provides(
 			kitcat.ConfigurableAnnotation(m),
+			config.PostgresEventStoreConfig,
+			kitevent.StoreAnnotation(kiteventpg.New),
 		)
 
 		var annots []kitdi.AnnotateOption

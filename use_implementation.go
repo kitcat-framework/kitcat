@@ -17,11 +17,12 @@ func UseImplementation[T Nameable](params UseImplementationParams[T]) (T, error)
 	retDefault := new(T)
 
 	var availableImplems []string
-	if params.ConfigImplementationName == "" && len(availableImplems) > 1 {
-		for _, implem := range params.Implementations {
-			availableImplems = append(availableImplems, implem.Name())
-		}
 
+	for _, implem := range params.Implementations {
+		availableImplems = append(availableImplems, implem.Name())
+	}
+
+	if params.ConfigImplementationName == "" && len(availableImplems) > 1 {
 		return *retDefault, fmt.Errorf(
 			"%s: you must set a %s, available: %s",
 			params.ModuleName,
@@ -37,6 +38,7 @@ func UseImplementation[T Nameable](params UseImplementationParams[T]) (T, error)
 		for _, c := range params.Implementations {
 			if c.Name() == params.ConfigImplementationName {
 				impl = &c
+				break
 			}
 		}
 	}

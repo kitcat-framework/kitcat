@@ -22,7 +22,7 @@ func NewInMemoryEventStore(logger *slog.Logger) *InMemoryEventStore {
 }
 
 func (p *InMemoryEventStore) AddEventHandler(eventName EventName, listener Handler) {
-	slog.Info("add event handler", slog.String("event_name", eventName.Name))
+	slog.Info("add Event Handler", slog.String("event_name", eventName.Name))
 	p.handlers[eventName] = append(p.handlers[eventName], listener)
 }
 
@@ -42,14 +42,14 @@ func (p *InMemoryEventStore) Produce(ctx context.Context, event Event, opts *Pro
 		}
 
 		for _, handler := range handlers {
-			_ = CallHandler(CallHandlerParams{
-				ctx:           ctx,
-				event:         event,
-				producer:      p,
-				opts:          opts,
-				handler:       handler,
-				logger:        p.logger,
-				isProduceSync: false,
+			_ = LocalCallHandler(LocalCallHandlerParams{
+				Ctx:           ctx,
+				Event:         event,
+				Producer:      p,
+				Opts:          opts,
+				Handler:       handler,
+				Logger:        p.logger,
+				IsProduceSync: false,
 			})
 		}
 	}()
@@ -69,14 +69,14 @@ func (p *InMemoryEventStore) ProduceSync(ctx context.Context, event Event, opts 
 	}
 
 	for _, handler := range handlers {
-		return CallHandler(CallHandlerParams{
-			ctx:           ctx,
-			event:         event,
-			producer:      p,
-			opts:          opts,
-			handler:       handler,
-			logger:        p.logger,
-			isProduceSync: true,
+		return LocalCallHandler(LocalCallHandlerParams{
+			Ctx:           ctx,
+			Event:         event,
+			Producer:      p,
+			Opts:          opts,
+			Handler:       handler,
+			Logger:        p.logger,
+			IsProduceSync: true,
 		})
 	}
 
@@ -87,10 +87,10 @@ func (p *InMemoryEventStore) Name() string {
 	return "in-memory"
 }
 
-func (p *InMemoryEventStore) OnStart() error {
+func (p *InMemoryEventStore) OnStart(_ context.Context) error {
 	return nil
 }
 
-func (p *InMemoryEventStore) OnStop() error {
+func (p *InMemoryEventStore) OnStop(_ context.Context) error {
 	return nil
 }
