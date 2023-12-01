@@ -57,6 +57,10 @@ func (p PostgresEventStore) Produce(ctx context.Context, event kitevent.Event, o
 		return fmt.Errorf("failed to marshalPayload event: %w", err)
 	}
 
+	if opt == nil {
+		opt = kitevent.NewProducerOptions()
+	}
+
 	evt := Event{
 		Payload:   datatypes.JSON(marshalPayload),
 		EventName: event.EventName().Name,

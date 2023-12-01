@@ -1,4 +1,4 @@
-package kitconfig
+package kitcfg
 
 import (
 	"encoding"
