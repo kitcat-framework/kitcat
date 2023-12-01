@@ -4,7 +4,6 @@ import (
 	"errors"
 	"fmt"
 	tea "github.com/charmbracelet/bubbletea"
-	"github.com/expectedsh/kitcat/kitconfig"
 	"github.com/expectedsh/kitcat/pkg/kitcat-cli/teacomponents"
 	"github.com/expectedsh/kitcat/pkg/kitcat-cli/templates/gen_setup_migrations"
 	"github.com/expectedsh/kitcat/pkg/kitcat-cli/utils"
@@ -218,10 +217,10 @@ func genSetupMigrationQuestions(m *generateSetupMigrations) error {
 			var dsn getDSN
 			switch m.Driver {
 			case "sqlite":
-				cfg := kitconfig.FromEnv[kitsqlite.Config]()
+				cfg := kitcfg.FromEnv[kitsqlite.Config]()
 				dsn = cfg
 			case "postgres":
-				cfg := kitconfig.FromEnv[kitpg.Config]()
+				cfg := kitcfg.FromEnv[kitpg.Config]()
 				dsn = cfg
 			}
 

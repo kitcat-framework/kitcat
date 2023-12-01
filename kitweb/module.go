@@ -5,7 +5,7 @@ import (
 	"crypto/tls"
 	"fmt"
 	"github.com/expectedsh/kitcat"
-	"github.com/expectedsh/kitcat/kitconfig"
+	"github.com/expectedsh/kitcat/kitcfg"
 	"github.com/expectedsh/kitcat/kitslog"
 	"github.com/expectedsh/kitcat/kittemplate"
 	"github.com/expectedsh/kitcat/kitweb/httpbind"
@@ -186,7 +186,7 @@ func (w *Module) setTemplateEngine(app *kitcat.App) {
 		// if no template engine is provided, we provide the default one
 		if engines.Engines == nil {
 			app.Provides(kittemplate.NewGoHTMLTemplateEngine(
-				kitconfig.FromEnv[kittemplate.GoHTMLEngineConfig]()),
+				kitcfg.FromEnv[kittemplate.GoHTMLEngineConfig]()),
 			)
 		}
 	})

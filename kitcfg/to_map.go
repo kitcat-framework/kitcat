@@ -1,6 +1,6 @@
 //go:build !windows
 
-package kitconfig
+package kitcfg
 
 import "strings"
 
