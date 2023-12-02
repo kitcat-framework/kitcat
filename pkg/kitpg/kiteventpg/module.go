@@ -36,7 +36,7 @@ func init() {
 }
 
 type PostgresEventStore struct {
-	handlers   map[kitevent.EventName][]kitevent.Handler
+	handlers   map[kitevent.EventName][]kitevent.Consumer
 	db         *gorm.DB
 	store      EventStoreStorage
 	logger     *slog.Logger
@@ -53,7 +53,7 @@ func New(db *gorm.DB, logger *slog.Logger, config *PostgresEventStoreConfig) *Po
 		logger: logger.With(
 			kitslog.Module("kitevent"),
 			slog.String("store", "postgres")),
-		handlers:   make(map[kitevent.EventName][]kitevent.Handler),
+		handlers:   make(map[kitevent.EventName][]kitevent.Consumer),
 		store:      NewPgEventStore(db),
 		ctx:        ctx,
 		cancelFunc: cancelFunc,
@@ -64,7 +64,7 @@ func New(db *gorm.DB, logger *slog.Logger, config *PostgresEventStoreConfig) *Po
 func (p PostgresEventStore) Produce(ctx context.Context, event kitevent.Event, opt *kitevent.ProducerOptions) error {
 	handlersConcerned := p.handlers[event.EventName()]
 	if len(handlersConcerned) == 0 {
-		return errors.New("no handler found for event")
+		return errors.New("no consumer found for event")
 	}
 
 	marshalPayload, err := json.Marshal(event)
@@ -83,11 +83,11 @@ func (p PostgresEventStore) Produce(ctx context.Context, event kitevent.Event, o
 		UpdatedAt: pgutils.TimestampUTC(time.Now()),
 	}
 
-	processors := make([]*HandlerResult, len(handlersConcerned))
-	for i, handler := range handlersConcerned {
+	processors := make([]*EventProcessingState, len(handlersConcerned))
+	for i, consumer := range handlersConcerned {
 		maxRetries := int32(1)
-		if handler.Options().MaxRetries != nil {
-			maxRetries = *handler.Options().MaxRetries
+		if consumer.Options().MaxRetries != nil {
+			maxRetries = *consumer.Options().MaxRetries
 		}
 
 		processableAt := time.Now()
@@ -96,25 +96,26 @@ func (p PostgresEventStore) Produce(ctx context.Context, event kitevent.Event, o
 		}
 
 		retryIntervalMs := int64(0)
-		if handler.Options().RetryInterval != nil {
-			retryIntervalMs = handler.Options().RetryInterval.Milliseconds()
+		if consumer.Options().RetryInterval != nil {
+			retryIntervalMs = consumer.Options().RetryInterval.Milliseconds()
 		}
 
-		processors[i] = &HandlerResult{
-			HandlerName:       handler.Name(),
-			Status:            EventHandlerResultStatusTakeable,
-			Error:             nil,
-			RetryNumber:       1,
-			MaxRetries:        maxRetries,
-			RetryIntervalMs:   retryIntervalMs,
-			CreatedAt:         pgutils.TimestampUTC(time.Now()),
-			UpdatedAt:         pgutils.TimestampUTC(time.Now()),
-			ProcessableAt:     pgutils.TimestampUTC(processableAt),
-			RunAt:             nil,
-			HandlerDurationMs: 0,
-			FailedAt:          nil,
-			SuccessAt:         nil,
-			PendingAt:         nil,
+		processors[i] = &EventProcessingState{
+			ConsumerName:                  consumer.Name(),
+			Status:                        EventProcessingStateStatusAvailable,
+			Error:                         nil,
+			RetryNumber:                   1,
+			ConsumerOptionMaxRetries:      maxRetries,
+			ConsumerOptionRetryIntervalMs: retryIntervalMs,
+			ConsumerOptionTimeoutMs:       consumer.Options().ConsumeTimeout.Milliseconds(),
+			CreatedAt:                     pgutils.TimestampUTC(time.Now()),
+			UpdatedAt:                     pgutils.TimestampUTC(time.Now()),
+			ProcessableAt:                 pgutils.TimestampUTC(processableAt),
+			RunAt:                         nil,
+			DurationMs:                    0,
+			FailedAt:                      nil,
+			SuccessAt:                     nil,
+			PendingAt:                     nil,
 		}
 	}
 
@@ -142,12 +143,12 @@ func (p PostgresEventStore) ProduceSync(
 	}
 
 	for _, handler := range handlers {
-		return kitevent.LocalCallHandler(kitevent.LocalCallHandlerParams{
+		return kitevent.LocalCallHandler(kitevent.LocalCallConsumerParams{
 			Ctx:           ctx,
 			Event:         event,
 			Producer:      p,
 			Opts:          opts,
-			Handler:       handler,
+			Consumer:      handler,
 			Logger:        p.logger,
 			IsProduceSync: true,
 		})
@@ -156,7 +157,7 @@ func (p PostgresEventStore) ProduceSync(
 	return nil
 }
 
-func (p PostgresEventStore) AddEventHandler(eventName kitevent.EventName, handler kitevent.Handler) {
+func (p PostgresEventStore) AddConsumer(eventName kitevent.EventName, handler kitevent.Consumer) {
 	p.handlers[eventName] = append(p.handlers[eventName], handler)
 }
 
@@ -168,7 +169,7 @@ func (p PostgresEventStore) OnStart(ctx context.Context) error {
 		}
 	}
 
-	err := p.db.WithContext(ctx).AutoMigrate(&Event{}, &HandlerResult{})
+	err := p.db.WithContext(ctx).AutoMigrate(&Event{}, &EventProcessingState{})
 	if err != nil {
 		return fmt.Errorf("failed to migrate event models: %w", err)
 	}
@@ -188,9 +189,9 @@ func (p PostgresEventStore) Name() string {
 	return "postgres"
 }
 
-// Run is a blocking function that will loop over handler results to find those who are in TAKEABLE status.
-// If one is found, it will call the handler associated to the event and update the handler result accordingly.
-// If none is found, it will wait for 500ms and try again.
+// Run is a blocking function that will loop over handler results to find those who are in EventProcessingStateStatusAvailable status.
+// If one is found, it will call the consumer associated to the event and update the handler result accordingly.
+// If none is found, it will wait for 500ms and try again. Basic polling.
 func (p PostgresEventStore) Run(ctx context.Context) {
 	for {
 		eventHandlerResult, err := p.getHandlerResult(ctx)
@@ -205,7 +206,7 @@ func (p PostgresEventStore) Run(ctx context.Context) {
 		}
 
 		for _, handler := range handlers {
-			if eventHandlerResult.HandlerName != handler.Name() {
+			if eventHandlerResult.ConsumerName != handler.Name() {
 				continue
 			}
 
@@ -228,89 +229,110 @@ func (p PostgresEventStore) Run(ctx context.Context) {
 	}
 }
 
-func (p PostgresEventStore) processHandlerResult(
+func (p PostgresEventStore) processConsumerResult(
 	ctx context.Context,
 	evt kitevent.Event,
-	handler kitevent.Handler,
-	evtHandlerResult *HandlerResult,
+	consumer kitevent.Consumer,
+	evtProcessingState *EventProcessingState,
 ) {
 	startHandlerAt := time.Now()
 
 	l := p.logger.With(
-		slog.Int("event_id", int(evtHandlerResult.EventID)),
-		slog.String("handler", handler.Name()),
+		slog.Int("event_id", int(evtProcessingState.EventID)),
+		slog.String("consumer", consumer.Name()),
 		slog.String("event_name", evt.EventName().Name))
 
 	l.Info("processing event")
-	err := kitevent.CallHandler(kitevent.CallHandlerParams{
-		Ctx:     ctx,
-		Event:   evt,
-		Handler: handler,
+
+	var err error
+	chErr := wrapResultAsChanErr(func() error {
+		return kitevent.CallConsumer(kitevent.CallConsumerParams{
+			Ctx:     ctx,
+			Event:   evt,
+			Handler: consumer,
+		})
 	})
 
+	select {
+	case <-ctx.Done():
+		err = ctx.Err()
+		break
+	case cerr := <-chErr:
+		err = cerr
+		break
+	}
+
 	var (
-		nextEvtHandlerResult []*HandlerResult
+		nextEvtProcessingStateResult []*EventProcessingState
 	)
 
-	evtHandlerResult.UpdatedAt = pgutils.TimestampUTC(time.Now())
-	evtHandlerResult.RunAt = lo.ToPtr(pgutils.TimestampUTC(time.Now()))
-	evtHandlerResult.HandlerDurationMs = time.Since(startHandlerAt).Milliseconds()
+	evtProcessingState.UpdatedAt = pgutils.TimestampUTC(time.Now())
+	evtProcessingState.RunAt = lo.ToPtr(pgutils.TimestampUTC(time.Now()))
+	evtProcessingState.DurationMs = time.Since(startHandlerAt).Milliseconds()
 
 	if err != nil {
-		evtHandlerResult.Error = lo.ToPtr(err.Error())
-		evtHandlerResult.Status = EventHandlerResultStatusFailed
-		evtHandlerResult.FailedAt = lo.ToPtr(pgutils.TimestampUTC(time.Now()))
+		evtProcessingState.Error = lo.ToPtr(err.Error())
+		evtProcessingState.Status = EventProcessingStateStatusFailed
+		evtProcessingState.FailedAt = lo.ToPtr(pgutils.TimestampUTC(time.Now()))
 
-		if evtHandlerResult.RetryNumber >= evtHandlerResult.MaxRetries {
+		if evtProcessingState.RetryNumber >= evtProcessingState.ConsumerOptionMaxRetries {
 			l.Error("failed to process event and max retries reached", kitslog.Err(err),
-				slog.Int("retry_number", int(evtHandlerResult.RetryNumber)),
-				slog.Int("max_retries", int(evtHandlerResult.MaxRetries)),
-				slog.Int64("retry_interval_ms", evtHandlerResult.RetryIntervalMs),
+				slog.Int("retry_number", int(evtProcessingState.RetryNumber)),
+				slog.Int("max_retries", int(evtProcessingState.ConsumerOptionMaxRetries)),
+				slog.Int64("retry_interval_ms", evtProcessingState.ConsumerOptionRetryIntervalMs),
 			)
-
 		} else {
 			l.Error("failed to process event, will retry", kitslog.Err(err),
-				slog.Int("retry_number", int(evtHandlerResult.RetryNumber)),
-				slog.Int("max_retries", int(evtHandlerResult.MaxRetries)),
-				slog.Int64("retry_interval_ms", evtHandlerResult.RetryIntervalMs),
+				slog.Int("retry_number", int(evtProcessingState.RetryNumber)),
+				slog.Int("max_retries", int(evtProcessingState.ConsumerOptionMaxRetries)),
+				slog.Int64("retry_interval_ms", evtProcessingState.ConsumerOptionRetryIntervalMs),
 			)
 
-			nextEvtHandlerResult = append(nextEvtHandlerResult, &HandlerResult{
-				HandlerName:       evtHandlerResult.HandlerName,
-				EventID:           evtHandlerResult.EventID,
-				Event:             evtHandlerResult.Event,
-				Status:            EventHandlerResultStatusTakeable,
-				RetryNumber:       evtHandlerResult.RetryNumber + 1,
-				MaxRetries:        evtHandlerResult.MaxRetries,
-				RetryIntervalMs:   evtHandlerResult.RetryIntervalMs,
-				CreatedAt:         pgutils.TimestampUTC(time.Now()),
-				UpdatedAt:         pgutils.TimestampUTC(time.Now()),
-				ProcessableAt:     pgutils.TimestampUTC(time.Now().Add(time.Duration(evtHandlerResult.RetryIntervalMs) * time.Millisecond)),
-				HandlerDurationMs: 0,
-				FailedAt:          nil,
-				SuccessAt:         nil,
+			nextEvtProcessingStateResult = append(nextEvtProcessingStateResult, &EventProcessingState{
+				ConsumerName:                  evtProcessingState.ConsumerName,
+				EventID:                       evtProcessingState.EventID,
+				Event:                         evtProcessingState.Event,
+				Status:                        EventProcessingStateStatusAvailable,
+				ConsumerOptionMaxRetries:      evtProcessingState.ConsumerOptionMaxRetries,
+				ConsumerOptionRetryIntervalMs: evtProcessingState.ConsumerOptionRetryIntervalMs,
+				ConsumerOptionTimeoutMs:       evtProcessingState.ConsumerOptionTimeoutMs,
+				CreatedAt:                     pgutils.TimestampUTC(time.Now()),
+				UpdatedAt:                     pgutils.TimestampUTC(time.Now()),
+				ProcessableAt:                 pgutils.TimestampUTC(time.Now().Add(time.Duration(evtProcessingState.ConsumerOptionRetryIntervalMs) * time.Millisecond)),
+				DurationMs:                    0,
+				RetryNumber:                   evtProcessingState.RetryNumber + 1,
+				FailedAt:                      nil,
+				SuccessAt:                     nil,
 			})
 		}
 
 	} else {
-		evtHandlerResult.Status = EventHandlerResultStatusSuccess
-		evtHandlerResult.SuccessAt = lo.ToPtr(pgutils.TimestampUTC(time.Now()))
+		evtProcessingState.Status = EventProcessingStateStatusSuccess
+		evtProcessingState.SuccessAt = lo.ToPtr(pgutils.TimestampUTC(time.Now()))
 	}
 
-	err = p.store.SaveEventHandlers(ctx, append(nextEvtHandlerResult, evtHandlerResult))
+	err = p.store.SaveEventHandlers(ctx, append(nextEvtProcessingStateResult, evtProcessingState))
 	if err != nil {
-		l.Error("failed to save event handler", kitslog.Err(err))
+		l.Error("failed to save event consumer", kitslog.Err(err))
 	}
 }
 
-func (p PostgresEventStore) getHandlerResult(ctx context.Context) (*HandlerResult, error) {
+func (p PostgresEventStore) getHandlerResult(ctx context.Context) (*EventProcessingState, error) {
 	ctx, cancelCtx := context.WithTimeout(ctx, time.Second)
 	defer cancelCtx()
 
-	evtHandlerResult, err := p.store.PeekEventHandlerResult(ctx)
+	evtHandlerResult, err := p.store.FindAvailableEvent(ctx)
 	if err != nil {
 		return nil, err
 	}
 
 	return evtHandlerResult, nil
+}
+
+func wrapResultAsChanErr(func() error) chan error {
+	errChan := make(chan error, 1)
+	go func() {
+		errChan <- nil
+	}()
+	return errChan
 }

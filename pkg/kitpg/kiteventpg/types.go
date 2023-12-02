@@ -19,41 +19,43 @@ func (Event) TableName() string {
 	return "kitevent.events"
 }
 
-type EventHandlerResultStatus string
+type EventProcessingStateStatus string
 
 const (
-	EventHandlerResultStatusFailed   EventHandlerResultStatus = "FAILED"
-	EventHandlerResultStatusSuccess  EventHandlerResultStatus = "SUCCESS"
-	EventHandlerResultStatusPending  EventHandlerResultStatus = "PENDING"
-	EventHandlerResultStatusTakeable EventHandlerResultStatus = "TAKEABLE"
+	EventProcessingStateStatusFailed    EventProcessingStateStatus = "FAILED"
+	EventProcessingStateStatusSuccess   EventProcessingStateStatus = "SUCCESS"
+	EventProcessingStateStatusPending   EventProcessingStateStatus = "PENDING"
+	EventProcessingStateStatusAvailable EventProcessingStateStatus = "AVAILABLE"
 )
 
-type HandlerResult struct {
-	ID          int32
-	HandlerName string
+type EventProcessingState struct {
+	ID           int32
+	ConsumerName string
 
 	EventID int32
 	Event   *Event
 
-	Status EventHandlerResultStatus `gorm:"index"`
+	Status EventProcessingStateStatus `gorm:"index"`
 	Error  *string
 
-	RetryNumber     int32
-	MaxRetries      int32
-	RetryIntervalMs int64
+	ConsumerOptionMaxRetries      int32
+	ConsumerOptionRetryIntervalMs int64
+	ConsumerOptionTimeoutMs       int64
 
 	CreatedAt     pgtype.Timestamp `gorm:"type:timestamp"`
 	UpdatedAt     pgtype.Timestamp `gorm:"type:timestamp"`
 	ProcessableAt pgtype.Timestamp `gorm:"type:timestamp"`
 
-	RunAt             *pgtype.Timestamp `gorm:"type:timestamp"`
-	HandlerDurationMs int64
+	RunAt       *pgtype.Timestamp `gorm:"type:timestamp"`
+	RetryNumber int32
+	DurationMs  int64
+	TimeoutAt   *pgtype.Timestamp `gorm:"->;type:timestamp GENERATED ALWAYS AS (run_at + (consumer_option_timeout_ms * interval '1 millisecond')) STORED;default:dummy();index"`
 
 	FailedAt  *pgtype.Timestamp `gorm:"type:timestamp"`
 	SuccessAt *pgtype.Timestamp `gorm:"type:timestamp"`
 	PendingAt *pgtype.Timestamp `gorm:"type:timestamp"`
 }
 
-func (HandlerResult) TableName() string {
-	return "kitevent.handler_results"
+func (EventProcessingState) TableName() string {
+	return "kitevent.event_processing_states"
 }

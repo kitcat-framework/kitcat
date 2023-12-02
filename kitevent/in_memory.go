@@ -8,21 +8,20 @@ import (
 )
 
 type InMemoryEventStore struct {
-	handlers map[EventName][]Handler
+	handlers map[EventName][]Consumer
 	logger   *slog.Logger
 }
 
 func NewInMemoryEventStore(logger *slog.Logger) *InMemoryEventStore {
 	return &InMemoryEventStore{
-		handlers: make(map[EventName][]Handler),
+		handlers: make(map[EventName][]Consumer),
 		logger: logger.With(
 			kitslog.Module("kitevent"),
 			slog.String("store", "in-memory")),
 	}
 }
 
-func (p *InMemoryEventStore) AddEventHandler(eventName EventName, listener Handler) {
-	slog.Info("add Event Handler", slog.String("event_name", eventName.Name))
+func (p *InMemoryEventStore) AddConsumer(eventName EventName, listener Consumer) {
 	p.handlers[eventName] = append(p.handlers[eventName], listener)
 }
 
@@ -42,12 +41,12 @@ func (p *InMemoryEventStore) Produce(ctx context.Context, event Event, opts *Pro
 		}
 
 		for _, handler := range handlers {
-			_ = LocalCallHandler(LocalCallHandlerParams{
+			_ = LocalCallHandler(LocalCallConsumerParams{
 				Ctx:           ctx,
 				Event:         event,
 				Producer:      p,
 				Opts:          opts,
-				Handler:       handler,
+				Consumer:      handler,
 				Logger:        p.logger,
 				IsProduceSync: false,
 			})
@@ -69,12 +68,12 @@ func (p *InMemoryEventStore) ProduceSync(ctx context.Context, event Event, opts 
 	}
 
 	for _, handler := range handlers {
-		return LocalCallHandler(LocalCallHandlerParams{
+		return LocalCallHandler(LocalCallConsumerParams{
 			Ctx:           ctx,
 			Event:         event,
 			Producer:      p,
 			Opts:          opts,
-			Handler:       handler,
+			Consumer:      handler,
 			Logger:        p.logger,
 			IsProduceSync: true,
 		})
