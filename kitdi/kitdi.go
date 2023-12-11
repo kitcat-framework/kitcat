@@ -115,3 +115,7 @@ func (p *ProvidableInvoker) Apply(c *dig.Container, _ ...dig.ProvideOption) erro
 type Applier interface {
 	Apply(c *dig.Container, opts ...dig.ProvideOption) error
 }
+
+// Invokable is used to mark a function as invokable.
+// Useful to avoir the need to call dig.Invoke on a function.
+type Invokable struct{}

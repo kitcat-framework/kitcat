@@ -7,6 +7,7 @@ import (
 	"github.com/expectedsh/kitcat/kitdi"
 	"github.com/expectedsh/kitcat/kitevent"
 	"github.com/expectedsh/kitcat/pkg/kitpg/kiteventpg"
+	"github.com/spf13/viper"
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
 	"gorm.io/gorm/logger"
@@ -15,19 +16,33 @@ import (
 )
 
 type Config struct {
-	Host     string `env:"POSTGRES_HOST" envDefault:"localhost"`
-	User     string `env:"POSTGRES_USER" envDefault:"postgres"`
-	Password string `env:"POSTGRES_PASSWORD" envDefault:"postgres"`
-	Port     string `env:"POSTGRES_PORT" envDefault:"5444"`
-	Database string `env:"POSTGRES_DB" envDefault:"postgres"`
-	SSLMode  string `env:"POSTGRES_SSL_MODE" envDefault:"disable"`
-	LogLevel int    `env:"POSTGRES_LOG_LEVEL" envDefault:"1"`
+	Host     string `cfg:"host"`
+	User     string `cfg:"user"`
+	Password string `cfg:"password"`
+	Port     string `cfg:"port"`
+	Database string `cfg:"database"`
+	SSLMode  string `cfg:"sslmode"`
+	LogLevel int    `cfg:"log_level"`
 
-	GormConfig *gorm.Config
+	GormConfig *gorm.Config // manually configurable
+}
 
-	PostgresEventStoreConfig kiteventpg.PostgresEventStoreConfig
+func (c *Config) InitConfig(prefix string) kitcat.ConfigUnmarshal {
+	prefix = prefix + ".database.postgres"
 
-	ConnectionName *string `env:"POSTGRES_CONNECTION_NAME"`
+	viper.SetDefault(prefix+".host", "localhost")
+	viper.SetDefault(prefix+".port", "5444")
+	viper.SetDefault(prefix+".user", "postgres")
+	viper.SetDefault(prefix+".password", "postgres")
+	viper.SetDefault(prefix+".database", "postgres")
+	viper.SetDefault(prefix+".sslmode", "disable")
+	viper.SetDefault(prefix+".log_level", 1)
+
+	return kitcat.ConfigUnmarshalHandler(prefix, c, "unable to unmarshal kitpg config: %w")
+}
+
+func init() {
+	kitcat.RegisterConfig(new(Config))
 }
 
 type Module struct {
@@ -35,36 +50,20 @@ type Module struct {
 	connection *gorm.DB
 }
 
-func New(config *Config) func(a *kitcat.App) {
-	return func(app *kitcat.App) {
-		m := &Module{config: config}
+func New(_ kitdi.Invokable, app *kitcat.App, config *Config) {
+	m := &Module{config: config}
 
-		app.Provides(
-			kitcat.ConfigurableAnnotation(m),
-			config.PostgresEventStoreConfig,
-			kitevent.StoreAnnotation(kiteventpg.New),
-		)
-
-		var annots []kitdi.AnnotateOption
-		if config.ConnectionName != nil {
-			annots = append(annots, kitdi.Name(fmt.Sprintf("kitpg.config.%s", *config.ConnectionName)))
-		}
-
-		app.Provides(
-			kitdi.Annotate(config, annots...),
-		)
-	}
+	app.Provides(
+		kitcat.ProvideConfigurableModule(m),
+		kitevent.ProvideStore(kiteventpg.New),
+	)
 }
 
 func (m *Module) Configure(_ context.Context, app *kitcat.App) error {
-	var annots []kitdi.AnnotateOption
+
 	gc := m.config.GormConfig
 	if gc == nil {
 		gc = &gorm.Config{}
-	}
-
-	if m.config.ConnectionName != nil {
-		annots = append(annots, kitdi.Name(fmt.Sprintf("gorm.conn.%s", *m.config.ConnectionName)))
 	}
 
 	dsn := fmt.Sprintf(
@@ -83,9 +82,7 @@ func (m *Module) Configure(_ context.Context, app *kitcat.App) error {
 
 	m.connection = db
 
-	app.Provides(
-		kitdi.Annotate(db, annots...),
-	)
+	app.Provides(db)
 
 	return nil
 }

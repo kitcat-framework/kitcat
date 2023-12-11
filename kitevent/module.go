@@ -5,12 +5,24 @@ import (
 	"github.com/expectedsh/kitcat"
 	"github.com/expectedsh/kitcat/kitdi"
 	"github.com/expectedsh/kitcat/kitslog"
+	"github.com/spf13/viper"
 	"log/slog"
 	"reflect"
 )
 
 type Config struct {
-	StoreName string `env:"KITEVENT_STORE_NAME" envDefault:"in-memory"`
+	StoreName string `cfg:"store_name"`
+}
+
+func (c *Config) InitConfig(prefix string) kitcat.ConfigUnmarshal {
+	prefix = prefix + ".kitevent"
+	viper.SetDefault(prefix+".store_name", "in-memory")
+
+	return kitcat.ConfigUnmarshalHandler(prefix, c, "unable to unmarshal kitevent config: %w")
+}
+
+func init() {
+	kitcat.RegisterConfig(new(Config))
 }
 
 type Module struct {
@@ -20,20 +32,17 @@ type Module struct {
 	CurrentStore Store
 }
 
-func New(config *Config) func(a *kitcat.App) {
-	return func(a *kitcat.App) {
-		mod := &Module{
-			config: config,
-			logger: slog.With(kitslog.Module("kitevent")),
-		}
-		a.Provides(
-			mod,
-			kitcat.ModuleAnnotation(mod),
-			kitcat.ConfigurableAnnotation(mod),
-			StoreAnnotation(NewInMemoryEventStore),
-			config,
-		)
+func New(_ kitdi.Invokable, a *kitcat.App, config *Config) {
+	mod := &Module{
+		config: config,
+		logger: slog.With(kitslog.Module("kitevent")),
 	}
+
+	a.Provides(
+		kitcat.ModuleAnnotation(mod),
+		kitcat.ProvideConfigurableModule(mod),
+		ProvideStore(NewInMemoryEventStore),
+	)
 }
 
 func (m *Module) Configure(_ context.Context, app *kitcat.App) error {

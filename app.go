@@ -2,41 +2,86 @@ package kitcat
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"github.com/expectedsh/dig"
 	"github.com/expectedsh/kitcat/kitdi"
 	"github.com/expectedsh/kitcat/kitexit"
 	"github.com/expectedsh/kitcat/kitreflect"
 	"github.com/expectedsh/kitcat/kitslog"
+	"github.com/google/uuid"
+	"github.com/mitchellh/mapstructure"
+	"github.com/samber/lo"
+	godiffpatch "github.com/sourcegraph/go-diff-patch"
+	"github.com/spf13/viper"
 	"log/slog"
 	"os"
 	"os/signal"
+	"path/filepath"
 	"reflect"
 	"slices"
+	"strconv"
 	"strings"
 	"syscall"
 	"time"
 )
 
-type Config struct {
-	Environment      *Environment  `env:"KITCAT_ENV" envDefault:"development"`
-	LoggerOutput     string        `env:"KITCAT_LOGGER_OUTPUT" envDefault:"stdout"`
-	HooksMaxLifetime time.Duration `env:"KITCAT_HOOK_MAX_LIFETIME" envDefault:"10s"`
+type AppConfig struct {
+	environment      *Environment
+	LoggerOutput     string        `cfg:"_logger_output"`
+	HooksMaxLifetime time.Duration `cfg:"_hooks_max_lifetime"`
+}
+
+func (c *AppConfig) InitConfig(prefix string) ConfigUnmarshal {
+	viper.SetDefault("_hooks_max_lifetime", "10s")
+	viper.SetDefault("_logger_output", "stdout")
+
+	// used internally to override config file
+	viper.SetDefault("_override_config_file", false)
+
+	return func() error {
+		err := viper.Unmarshal(c, func(config *mapstructure.DecoderConfig) {
+			config.TagName = "cfg"
+		})
+		if err != nil {
+			return fmt.Errorf("unable to unmarshal app config: %w", err)
+		}
+
+		return nil
+	}
+}
+
+func init() {
+	RegisterConfig(new(AppConfig))
 }
 
 type App struct {
-	config    *Config
+	config    *AppConfig
 	container *dig.Container
 }
 
+var configs = make([]Config, 0)
+
+// configsAny is used to rovide them to dig, without that all configs will be the same type (Config) and
+// could not be used in constructors
+var configsAny = make([]any, 0)
+
 var GetLoggerFunc = getDefaultLogger
 
-func New(cfg *Config) *App {
+func New() *App {
+	val, _ := lo.Find(configs, func(c Config) bool {
+		_, ok := c.(*AppConfig)
+		return ok
+	})
+
 	a := &App{
-		config:    cfg,
+		config:    val.(*AppConfig),
 		container: dig.New(),
 	}
 
+	_ = a.container.Provide(func() kitdi.Invokable { return kitdi.Invokable{} })
+
+	a.loadConfigs()
 	a.init()
 
 	return a
@@ -50,7 +95,7 @@ func (a *App) Run() {
 
 	slog.Info("kitcat: started", slog.Duration("elapsed_time", time.Since(mesureStart)))
 
-	if a.config.Environment.Equal(Development) {
+	if a.config.environment.Equal(EnvironmentDevelopment) {
 		f, err := os.Create("dig.dot")
 		if err == nil {
 			_ = dig.Visualize(a.container, f)
@@ -88,6 +133,136 @@ func (a *App) stopModules() {
 
 		return nil
 	})
+}
+
+// LoadConfigs loads the config file and environment variables
+// Environment variable is always prioritized over config file
+// In a config you can set $<SOMETHING>  of ${SOMETHING} to get the value of an environment variable
+//
+// The config can be override by setting the environment variable OVERRIDE_CONFIG_FILE to true, it
+// is used when adding module to an app to get the config for the module without having to write it.
+//
+// But the default behavior is to create a patch file that can be applied to the config file, in order
+// to let the user add comments and stuffs for his own needs.
+func (a *App) loadConfigs() {
+	viper.SetConfigFile("config.yaml")
+	viper.SetDefault("_environment", "development")
+
+	unmarshalers := map[string][]ConfigUnmarshal{}
+
+	for _, env := range AllEnvironments {
+		for _, config := range configs {
+			if _, ok := unmarshalers[env.Name]; !ok {
+				unmarshalers[env.Name] = make([]ConfigUnmarshal, 0)
+			} else {
+				unmarshalers[env.Name] = append(unmarshalers[env.Name], config.InitConfig(env.Name))
+			}
+		}
+
+	}
+
+	viper.AutomaticEnv()
+
+	errReadConfig := viper.ReadInConfig()
+
+	envStr := viper.GetString("_environment")
+	if envStr == "" {
+		kitexit.Abnormal(errors.New("kitcat: environment is not set"))
+	} else if strings.HasPrefix(envStr, "$") {
+		envStr = os.ExpandEnv(envStr)
+	}
+
+	var env Environment
+	if err := env.UnmarshalText([]byte(envStr)); err != nil {
+		kitexit.Abnormal(fmt.Errorf("kitcat: invalid environment: %w", err))
+	}
+
+	configOverrideStr := viper.GetString("_override_config_file")
+	if configOverrideStr == "" {
+		configOverrideStr = "false"
+	} else if strings.HasPrefix(configOverrideStr, "$") {
+		configOverrideStr = os.ExpandEnv(configOverrideStr)
+	}
+
+	configOverride, err := strconv.ParseBool(configOverrideStr)
+	if err != nil {
+		kitexit.Abnormal(fmt.Errorf("kitcat: invalid override config file value %s: %w", configOverrideStr, err))
+	}
+
+	if errReadConfig != nil {
+		var configFileNotFoundError viper.ConfigFileNotFoundError
+		if errors.As(errReadConfig, &configFileNotFoundError) ||
+			strings.Contains(errReadConfig.Error(), "no such file or directory") {
+			if err := viper.WriteConfigAs("config.yaml"); err != nil {
+				kitexit.Abnormal(fmt.Errorf("kitcat: error writing config file: %w", err))
+			}
+
+		} else {
+			kitexit.Abnormal(fmt.Errorf("kitcat: error reading config file: %w", errReadConfig))
+		}
+	} else {
+		if env.Equal(EnvironmentProduction) {
+			return
+		}
+
+		if configOverride {
+			if err := viper.WriteConfigAs("config.yaml"); err != nil {
+				kitexit.Abnormal(fmt.Errorf("kitcat: error writing config file: %w", err))
+			}
+		} else {
+			// create a patch file
+
+			temp, err := os.MkdirTemp("", "kitcat")
+			if err != nil {
+				kitexit.Abnormal(fmt.Errorf("kitcat: error creating temporary directory: %w", err))
+			}
+
+			tempFileName := filepath.Join(temp, fmt.Sprintf("config%s.yaml", uuid.New().String()))
+			if err := viper.WriteConfigAs(tempFileName); err != nil {
+				kitexit.Abnormal(fmt.Errorf("kitcat: error writing new config in temp file: %w", err))
+			}
+
+			newFileContent, err := os.ReadFile(tempFileName)
+			if err != nil {
+				kitexit.Abnormal(fmt.Errorf("kitcat: error reading temp config file: %w", err))
+			}
+
+			oldFileContent, err := os.ReadFile("config.yaml")
+			if err != nil {
+				kitexit.Abnormal(fmt.Errorf("kitcat: error reading config file: %w", err))
+			}
+
+			patch := godiffpatch.GeneratePatch("config.yml", string(oldFileContent), string(newFileContent))
+
+			if err := os.WriteFile("config.yml.patch", []byte(patch), 0644); err != nil {
+				kitexit.Abnormal(fmt.Errorf("kitcat: error writing patch file: %w", err))
+			}
+		}
+	}
+
+	for _, k := range viper.AllKeys() {
+		val := viper.GetString(k)
+		if strings.HasPrefix(val, "$") {
+			viper.Set(k, os.ExpandEnv(val))
+		} else {
+			// if we do not do that the non-expanded values will be discarded from sub configs.
+			// maybe a bug ?
+			viper.Set(k, val)
+		}
+	}
+
+	for _, unmarshaler := range unmarshalers[env.Name] {
+		if err := unmarshaler(); err != nil {
+			kitexit.Abnormal(fmt.Errorf("kitcat: error while unmarshaling config for env %s: %w", env.Name, err))
+		}
+	}
+
+	// set manually the environment
+	a.config.environment = &env
+
+	for _, config := range configsAny {
+		a.Provides(config)
+	}
 }
 
 func (a *App) startModules() {
@@ -170,7 +345,7 @@ func (a *App) Invoke(function any, opts ...dig.InvokeOption) {
 }
 
 func (a *App) init() {
-	a.Provides(a, a.config)
+	a.Provides(a)
 
 	var (
 		out    = os.Stdout
@@ -184,16 +359,21 @@ func (a *App) init() {
 		out = os.Stdout
 	}
 
-	logger = GetLoggerFunc(a.config.Environment, out)
+	logger = GetLoggerFunc(a.config.environment, out)
 
 	slog.SetDefault(logger)
 	a.Provides(logger)
 }
 
+func RegisterConfig[T Config](config T) {
+	configs = append(configs, config)
+	configsAny = append(configsAny, config)
+}
+
 func getDefaultLogger(environment *Environment, out *os.File) *slog.Logger {
 	var logger *slog.Logger
 
-	if environment.String() == Production.String() {
+	if environment.String() == EnvironmentProduction.String() {
 		logger = slog.New(slog.NewJSONHandler(out, nil))
 	} else {
 		logger = slog.New(slog.NewTextHandler(out, nil))
@@ -210,16 +390,12 @@ func isProvidableInvoker(any any) bool {
 		return false
 	}
 
-	if !kitreflect.EnsureInOutLength(reflection, 1, 0) {
+	if !kitreflect.EnsureMinParams(reflection, 1) {
 		return false
 	}
 
-	if reflection.In(0).Kind() != reflect.Ptr {
+	if reflection.In(0).Name() != "Invokable" {
 		return false
-	}
-
-	if reflection.In(0).AssignableTo(reflect.TypeOf((*App)(nil)).Elem()) {
-		return true
 	}
 
 	return true

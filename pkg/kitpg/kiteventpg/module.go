@@ -5,10 +5,12 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/expectedsh/kitcat"
 	"github.com/expectedsh/kitcat/kitevent"
 	"github.com/expectedsh/kitcat/kitslog"
 	"github.com/expectedsh/kitcat/pkg/kitpg/pgutils"
 	"github.com/samber/lo"
+	"github.com/spf13/viper"
 	"gorm.io/datatypes"
 	"gorm.io/gorm"
 	"log/slog"
@@ -16,8 +18,21 @@ import (
 )
 
 type PostgresEventStoreConfig struct {
-	DelayBetweenPeek time.Duration `env:"KIT_EVENT_PG_DELAY_BETWEEN_PEEK" envDefault:"500ms"`
-	CreateSchema     bool          `env:"KIT_EVENT_PG_CREATE_SCHEMA" envDefault:"true"`
+	PollInterval time.Duration `cfg:"poll_interval"`
+	CreateSchema bool          `cfg:"create_schema"`
+}
+
+func (c *PostgresEventStoreConfig) InitConfig(prefix string) kitcat.ConfigUnmarshal {
+	prefix = prefix + ".kitevent.config_stores.postgres"
+
+	viper.SetDefault(prefix+".poll_interval", time.Millisecond*500)
+	viper.SetDefault(prefix+".create_schema", true)
+
+	return kitcat.ConfigUnmarshalHandler(prefix, c, "unable to unmarshal postgres event store config: %w")
+}
+
+func init() {
+	kitcat.RegisterConfig(new(PostgresEventStoreConfig))
 }
 
 type PostgresEventStore struct {
@@ -31,7 +46,7 @@ type PostgresEventStore struct {
 	config *PostgresEventStoreConfig
 }
 
-func New(db *gorm.DB, logger *slog.Logger, config PostgresEventStoreConfig) *PostgresEventStore {
+func New(db *gorm.DB, logger *slog.Logger, config *PostgresEventStoreConfig) *PostgresEventStore {
 	ctx, cancelFunc := context.WithCancel(context.Background())
 	return &PostgresEventStore{
 		db: db,
@@ -42,7 +57,7 @@ func New(db *gorm.DB, logger *slog.Logger, config PostgresEventStoreConfig) *Pos
 		store:      NewPgEventStore(db),
 		ctx:        ctx,
 		cancelFunc: cancelFunc,
-		config:     &config,
+		config:     config,
 	}
 }
 

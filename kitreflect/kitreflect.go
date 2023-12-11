@@ -13,6 +13,10 @@ func EnsureInOutLength(t reflect.Type, in, out int) bool {
 	return t.NumIn() == in && t.NumOut() == out
 }
 
+func EnsureMinParams(t reflect.Type, min int) bool {
+	return t.NumIn() >= min
+}
+
 func EnsureOutIsError(t reflect.Type) bool {
 	return t.Out(t.NumOut()-1).Name() == "error"
 }

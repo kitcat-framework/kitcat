@@ -2,16 +2,26 @@ package kitcache
 
 import (
 	"context"
-	"github.com/dgraph-io/ristretto"
 	"github.com/expectedsh/kitcat"
 	"github.com/expectedsh/kitcat/kitdi"
 	"github.com/expectedsh/kitcat/kitslog"
+	"github.com/spf13/viper"
 	"log/slog"
 )
 
 type Config struct {
-	StoreName      string `env:"KITCACHE_STORE_NAME" envDefault:"in_memory"`
-	InMemoryConfig *ristretto.Config
+	StoreName string `cfg:"store_name"`
+}
+
+func (c *Config) InitConfig(prefix string) kitcat.ConfigUnmarshal {
+	prefix = prefix + ".kitcache"
+	viper.SetDefault(prefix+".store_name", "in_memory")
+
+	return kitcat.ConfigUnmarshalHandler(prefix, c, "unable to unmarshal kitcache config: %w")
+}
+
+func init() {
+	kitcat.RegisterConfig(new(Config))
 }
 
 type Module struct {
@@ -21,20 +31,16 @@ type Module struct {
 	logger *slog.Logger
 }
 
-func New(config *Config) func(app *kitcat.App) {
-	return func(app *kitcat.App) {
-		mod := &Module{
-			Config: config,
-			logger: slog.With(kitslog.Module("kitcache")),
-		}
-
-		app.Provides(
-			mod,
-			kitcat.ConfigurableAnnotation(mod),
-			StoreAnnotation(NewInMemoryStore),
-			config,
-		)
+func New(_ kitdi.Invokable, config *Config, app *kitcat.App) {
+	mod := &Module{
+		Config: config,
+		logger: slog.With(kitslog.Module("kitcache")),
 	}
+
+	app.Provides(
+		kitcat.ProvideConfigurableModule(mod),
+		ProvideStore(NewInMemoryStore),
+	)
 }
 
 func (m *Module) Configure(_ context.Context, app *kitcat.App) error {

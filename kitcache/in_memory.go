@@ -3,24 +3,56 @@ package kitcache
 import (
 	"fmt"
 	"github.com/dgraph-io/ristretto"
+	"github.com/expectedsh/dig"
+	"github.com/expectedsh/kitcat"
+	"github.com/spf13/viper"
 )
+
+type InMemoryStoreConfig struct {
+	NumCounters int64 `cfg:"num_counters"`
+	MaxCost     int64 `cfg:"max_cost"`
+	BufferItems int64 `cfg:"buffer_items"`
+}
+
+func (i *InMemoryStoreConfig) InitConfig(prefix string) kitcat.ConfigUnmarshal {
+	prefix = fmt.Sprintf("%s.config_stores.in_memory", prefix)
+
+	viper.SetDefault(prefix+".num_counters", 1e7)
+	viper.SetDefault(prefix+".max_cost", 1<<30)
+	viper.SetDefault(prefix+".buffer_items", 64)
+
+	return kitcat.ConfigUnmarshalHandler(prefix, i, "unable to unmarshal in memory store config: %w")
+}
+
+func init() {
+	kitcat.RegisterConfig(new(InMemoryStoreConfig))
+}
 
 type InMemoryStore struct {
 	Cache *ristretto.Cache
 }
 
-func NewInMemoryStore(config *Config) (*InMemoryStore, error) {
-	cfg := &ristretto.Config{
-		NumCounters: 1e7,     // number of keys to track frequency of (10M).
-		MaxCost:     1 << 30, // maximum cost of cache (1GB).
-		BufferItems: 64,      // number of keys per Get buffer.
+type InMemoryStoreParams struct {
+	dig.In
+
+	Config *InMemoryStoreConfig
+
+	// To set it manually, just provide a *ristretto.Config in the kitcat.App.Provides() method
+	RistrettoConfig *ristretto.Config `optional:"true"`
+}
+
+func NewInMemoryStore(params InMemoryStoreParams) (*InMemoryStore, error) {
+	ristrettoConfig := &ristretto.Config{
+		NumCounters: params.Config.NumCounters,
+		MaxCost:     params.Config.MaxCost,
+		BufferItems: params.Config.BufferItems,
 	}
 
-	if config.InMemoryConfig != nil {
-		cfg = config.InMemoryConfig
+	if params.RistrettoConfig != nil {
+		ristrettoConfig = params.RistrettoConfig
 	}
 
-	cache, err := ristretto.NewCache(cfg)
+	cache, err := ristretto.NewCache(ristrettoConfig)
 
 	if err != nil {
 		return nil, fmt.Errorf("error while creating in memory cache: %w", err)

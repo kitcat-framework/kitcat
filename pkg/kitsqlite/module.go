@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"github.com/expectedsh/kitcat"
 	"github.com/expectedsh/kitcat/kitdi"
+	"github.com/spf13/viper"
 	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
 	"gorm.io/gorm/logger"
@@ -13,12 +14,23 @@ import (
 )
 
 type Config struct {
-	File     string `env:"SQLITE_FILE" envDefault:"db.sqlite"`
-	LogLevel int    `env:"SQLITE_LOG_LEVEL" envDefault:"1"`
+	File     string `cfg:"file"`
+	LogLevel int    `cfg:"log_level"`
 
 	GormConfig *gorm.Config
+}
 
-	ConnectionName *string `env:"SQLITE_CONNECTION_NAME"`
+func (c *Config) InitConfig(prefix string) kitcat.ConfigUnmarshal {
+	prefix = prefix + ".database.sqlite"
+
+	viper.SetDefault(prefix+".file", "db.sqlite")
+	viper.SetDefault(prefix+".log_level", 1)
+
+	return kitcat.ConfigUnmarshalHandler(prefix, c, "unable to unmarshal kitsqlite config: %w")
+}
+
+func Init() {
+	kitcat.RegisterConfig(new(Config))
 }
 
 type Module struct {
@@ -26,34 +38,18 @@ type Module struct {
 	connection *gorm.DB
 }
 
-func New(config *Config) func(a *kitcat.App) {
-	return func(app *kitcat.App) {
-		m := &Module{config: config}
+func New(_ kitdi.Invokable, config *Config, app *kitcat.App) {
+	m := &Module{config: config}
 
-		app.Provides(
-			kitcat.ConfigurableAnnotation(m),
-		)
-
-		var annots []kitdi.AnnotateOption
-		if config.ConnectionName != nil {
-			annots = append(annots, kitdi.Name(fmt.Sprintf("kitsqlite.config.%s", *config.ConnectionName)))
-		}
-
-		app.Provides(
-			kitdi.Annotate(config, annots...),
-		)
-	}
+	app.Provides(
+		kitcat.ProvideConfigurableModule(m),
+	)
 }
 
 func (m *Module) Configure(_ context.Context, app *kitcat.App) error {
-	var annots []kitdi.AnnotateOption
 	gc := m.config.GormConfig
 	if gc == nil {
 		gc = &gorm.Config{}
-	}
-
-	if m.config.ConnectionName != nil {
-		annots = append(annots, kitdi.Name(fmt.Sprintf("gorm.conn.%s", *m.config.ConnectionName)))
 	}
 
 	if gc.Logger == nil {
@@ -67,9 +63,7 @@ func (m *Module) Configure(_ context.Context, app *kitcat.App) error {
 
 	m.connection = db
 
-	app.Provides(
-		kitdi.Annotate(db, annots...),
-	)
+	app.Provides(db)
 
 	return nil
 }

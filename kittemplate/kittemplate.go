@@ -26,6 +26,6 @@ type (
 	}
 )
 
-func EngineAnnotation(a any) *kitdi.Annotation {
+func ProvideEngine(a any) *kitdi.Annotation {
 	return kitdi.Annotate(a, kitdi.Group("kittemplate.engine"), kitdi.As((*Engine)(nil)))
 }

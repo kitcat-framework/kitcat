@@ -133,10 +133,10 @@ func NewEventName(name string) EventName {
 	}
 }
 
-func EventHandlerAnnotation(handler any) *kitdi.Annotation {
+func ProvideEventHandler(handler any) *kitdi.Annotation {
 	return kitdi.Annotate(handler, kitdi.Group("kitevent.Handler"), kitdi.As(new(Handler)))
 }
 
-func StoreAnnotation(store any) *kitdi.Annotation {
+func ProvideStore(store any) *kitdi.Annotation {
 	return kitdi.Annotate(store, kitdi.Group("kitevent.store"), kitdi.As(new(Store)))
 }

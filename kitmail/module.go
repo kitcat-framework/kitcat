@@ -5,17 +5,23 @@ import (
 	"github.com/expectedsh/kitcat"
 	"github.com/expectedsh/kitcat/kitdi"
 	"github.com/expectedsh/kitcat/kitslog"
+	"github.com/spf13/viper"
 	"log/slog"
 )
 
 type Config struct {
-	Host     string `env:"SMTP_HOST"`
-	Port     int    `env:"SMTP_PORT"`
-	Identity string `env:"SMTP_IDENTITY"`
-	Username string `env:"SMTP_USERNAME"`
-	Password string `env:"SMTP_PASSWORD"`
+	SenderName string `cfg:"sender_name"`
+}
 
-	SenderName string `env:"KITMAIL_SENDER_NAME" envDefault:"smtp"`
+func (c *Config) InitConfig(prefix string) kitcat.ConfigUnmarshal {
+	prefix = prefix + ".kitmail"
+	viper.SetDefault(prefix+".sender_name", "smtp")
+
+	return kitcat.ConfigUnmarshalHandler(prefix, c, "unable to unmarshal kitmail config: %w")
+}
+
+func init() {
+	kitcat.RegisterConfig(new(Config))
 }
 
 type Module struct {
@@ -25,20 +31,17 @@ type Module struct {
 	logger        *slog.Logger
 }
 
-func New(config *Config) func(app *kitcat.App) {
-	return func(app *kitcat.App) {
-		mod := &Module{
-			Config: config,
-			logger: slog.With(kitslog.Module("kitmail")),
-		}
-
-		app.Provides(
-			mod,
-			kitcat.ConfigurableAnnotation(mod),
-			SenderAnnotation(NewSmtpSender),
-			config,
-		)
+func New(_ kitdi.Invokable, app *kitcat.App, config *Config) {
+	mod := &Module{
+		Config: config,
+		logger: slog.With(kitslog.Module("kitmail")),
 	}
+
+	app.Provides(
+		kitcat.ProvideConfigurableModule(mod),
+		ProvideSender(NewSmtpSender),
+	)
+
 }
 
 func (m *Module) Configure(_ context.Context, app *kitcat.App) error {

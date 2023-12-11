@@ -2,6 +2,8 @@ package kittemplate
 
 import (
 	"fmt"
+	"github.com/expectedsh/kitcat"
+	"github.com/spf13/viper"
 	"html/template"
 	"io"
 	"os"
@@ -19,19 +21,33 @@ var LayoutTemplate = `{{define "layout" }} {{ template "%s" . }} {{ end }}`
 type GoHTMLEngineConfig struct {
 	// Folder is where the templates are stored.
 	// This is usually where your store your pages
-	Folder string `env:"GOHTML_TEMPLATE_FOLDER" envDefault:"templates"`
+	Folder string `cfg:"folder"`
 
 	// LayoutsFolder is where the layout templates are stored.
 	// This is where you can set a base layout for your templates.
 	// The name of your layout must be the same as the name of your template.
 	// If the name is base.gohtml, the layout must contain {{ define "base" }} to be considered as a layout.
-	LayoutsFolder string `env:"GOHTML_TEMPLATE_LAYOUTS_FOLDER" envDefault:"layouts"`
+	LayoutsFolder string `cfg:"layouts_folder"`
 
 	// PartialsFolder is where the partial templates are stored.
 	// This is where you can set a base layout for your templates.
 	// A template must start with {{ define "name" }} to be considered as a partial.
 	// The name of the define must the same as the name of the file.
-	PartialsFolder string `env:"GOHTML_TEMPLATE_PARTIALS_FOLDER" envDefault:"partials"`
+	PartialsFolder string `cfg:"partials_folder"`
+}
+
+func (c *GoHTMLEngineConfig) InitConfig(prefix string) kitcat.ConfigUnmarshal {
+	prefix = prefix + ".kittemplate.template_engines.gohtml"
+
+	viper.SetDefault(prefix+".folder", "templates")
+	viper.SetDefault(prefix+".layouts_folder", "layouts")
+	viper.SetDefault(prefix+".partials_folder", "partials")
+
+	return kitcat.ConfigUnmarshalHandler(prefix, c, "unable to unmarshal gohtml template config: %w")
+}
+
+func init() {
+	kitcat.RegisterConfig(new(GoHTMLEngineConfig))
 }
 
 type GoHTMLEngine struct {

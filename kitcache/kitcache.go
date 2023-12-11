@@ -72,7 +72,7 @@ type (
 	}
 )
 
-func StoreAnnotation(store any) *kitdi.Annotation {
+func ProvideStore(store any) *kitdi.Annotation {
 	return kitdi.Annotate(store, kitdi.As(new(Store)), kitdi.Group("kitcache.store"))
 }
 

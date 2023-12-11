@@ -22,6 +22,6 @@ type (
 	}
 )
 
-func SenderAnnotation(sender any) *kitdi.Annotation {
+func ProvideSender(sender any) *kitdi.Annotation {
 	return kitdi.Annotate(sender, kitdi.Group("kitmail.sender"), kitdi.As(new(Sender)))
 }

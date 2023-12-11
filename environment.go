@@ -14,9 +14,11 @@ func (e *Environment) UnmarshalText(text []byte) error {
 	name := string(text)
 	switch name {
 	case "development":
-		*e = Development
+		*e = EnvironmentDevelopment
 	case "production":
-		*e = Production
+		*e = EnvironmentProduction
+	case "test":
+		*e = EnvironmentTest
 	default:
 		return ErrInvalidEnvironment
 	}
@@ -33,6 +35,13 @@ func (e *Environment) Equal(development Environment) bool {
 }
 
 var (
-	Development = Environment{Name: "development"}
-	Production  = Environment{Name: "production"}
+	EnvironmentDevelopment = Environment{Name: "development"}
+	EnvironmentProduction  = Environment{Name: "production"}
+	EnvironmentTest        = Environment{Name: "test"}
 )
+
+var AllEnvironments = []Environment{
+	EnvironmentDevelopment,
+	EnvironmentProduction,
+	EnvironmentTest,
+}

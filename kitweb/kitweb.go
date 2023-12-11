@@ -28,6 +28,6 @@ type (
 	}
 )
 
-func HandlerAnnotation(handler any) *kitdi.Annotation {
+func ProvideHandler(handler any) *kitdi.Annotation {
 	return kitdi.Annotate(handler, kitdi.Group("kitweb.handler"), kitdi.As(new(Handler)))
 }
