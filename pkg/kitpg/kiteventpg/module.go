@@ -170,7 +170,7 @@ func (p PostgresEventStore) OnStart(ctx context.Context) error {
 
 	err := p.db.WithContext(ctx).AutoMigrate(&Event{}, &HandlerResult{})
 	if err != nil {
-		return fmt.Errorf("failed to migrate event model: %w", err)
+		return fmt.Errorf("failed to migrate event models: %w", err)
 	}
 
 	go p.Run(p.ctx)
@@ -194,7 +194,7 @@ func (p PostgresEventStore) Name() string {
 func (p PostgresEventStore) Run(ctx context.Context) {
 	for {
 		eventHandlerResult, err := p.getHandlerResult(ctx)
-		if err != nil {
+		if err != nil || eventHandlerResult == nil {
 			time.Sleep(time.Millisecond * 500) // TODO: make it configurable
 			continue
 		}
@@ -215,9 +215,8 @@ func (p PostgresEventStore) Run(ctx context.Context) {
 				continue
 			}
 
-			// TODO: process them in a pool to avoid having lot of PENDING events whereas
-			// the handler is not able to process them all
-			go p.processHandlerResult(
+			// TODO: process them in a pool to avoid having blocking handler
+			p.processHandlerResult(
 				ctx,
 				event,
 				handler,
@@ -240,7 +239,6 @@ func (p PostgresEventStore) processHandlerResult(
 	l := p.logger.With(
 		slog.Int("event_id", int(evtHandlerResult.EventID)),
 		slog.String("handler", handler.Name()),
-		slog.String("event", string(evtHandlerResult.Event.Payload)),
 		slog.String("event_name", evt.EventName().Name))
 
 	l.Info("processing event")
@@ -259,8 +257,9 @@ func (p PostgresEventStore) processHandlerResult(
 	evtHandlerResult.HandlerDurationMs = time.Since(startHandlerAt).Milliseconds()
 
 	if err != nil {
-
 		evtHandlerResult.Error = lo.ToPtr(err.Error())
+		evtHandlerResult.Status = EventHandlerResultStatusFailed
+		evtHandlerResult.FailedAt = lo.ToPtr(pgutils.TimestampUTC(time.Now()))
 
 		if evtHandlerResult.RetryNumber >= evtHandlerResult.MaxRetries {
 			l.Error("failed to process event and max retries reached", kitslog.Err(err),
@@ -268,9 +267,6 @@ func (p PostgresEventStore) processHandlerResult(
 				slog.Int("max_retries", int(evtHandlerResult.MaxRetries)),
 				slog.Int64("retry_interval_ms", evtHandlerResult.RetryIntervalMs),
 			)
-
-			evtHandlerResult.Status = EventHandlerResultStatusFailed
-			evtHandlerResult.FailedAt = lo.ToPtr(pgutils.TimestampUTC(time.Now()))
 
 		} else {
 			l.Error("failed to process event, will retry", kitslog.Err(err),

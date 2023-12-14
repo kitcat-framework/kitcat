@@ -2,6 +2,7 @@ package kiteventpg
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"gorm.io/gorm"
 )
@@ -76,6 +77,10 @@ func (p PgEventStore) PeekEventHandlerResult(ctx context.Context) (*HandlerResul
 			return fmt.Errorf("failed to get event handler: %w", err)
 		}
 
+		if handler.ID == 0 {
+			return gorm.ErrRecordNotFound
+		}
+
 		err = tx.First(&evt, handler.EventID).Error
 		if err != nil {
 			return fmt.Errorf("failed to get event: %w", err)
@@ -85,6 +90,9 @@ func (p PgEventStore) PeekEventHandlerResult(ctx context.Context) (*HandlerResul
 	})
 
 	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, nil
+		}
 		return nil, err
 	}
 

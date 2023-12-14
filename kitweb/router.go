@@ -146,6 +146,6 @@ func (r *Router) initPublicFolder() {
 
 	if folder != "" {
 		publicHandler := http.StripPrefix(path, http.FileServer(http.Dir(folder)))
-		r.handler.PathPrefix(path).Handler(addTrailingSlash(publicHandler))
+		r.handler.PathPrefix(path).Handler(publicHandler)
 	}
 }

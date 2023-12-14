@@ -30,6 +30,10 @@ func IsHandler(handler kitcat.Nameable) bool {
 		return false
 	}
 
+	if handleFunc.Type().In(1).Kind() != reflect.Ptr {
+		return false
+	}
+
 	if !handleFunc.Type().In(1).AssignableTo(reflect.TypeOf((*Event)(nil)).Elem()) {
 		return false
 	}

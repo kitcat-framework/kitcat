@@ -32,11 +32,9 @@ type AppConfig struct {
 	HooksMaxLifetime time.Duration `cfg:"_hooks_max_lifetime"`
 }
 
-func (c *AppConfig) InitConfig(prefix string) ConfigUnmarshal {
+func (c *AppConfig) InitConfig(_ string) ConfigUnmarshal {
 	viper.SetDefault("_hooks_max_lifetime", "10s")
 	viper.SetDefault("_logger_output", "stdout")
-
-	// used internally to override config file
 	viper.SetDefault("_override_config_file", false)
 
 	return func() error {
@@ -152,11 +150,13 @@ func (a *App) loadConfigs() {
 
 	for _, env := range AllEnvironments {
 		for _, config := range configs {
+
 			if _, ok := unmarshalers[env.Name]; !ok {
 				unmarshalers[env.Name] = make([]ConfigUnmarshal, 0)
-			} else {
-				unmarshalers[env.Name] = append(unmarshalers[env.Name], config.InitConfig(env.Name))
 			}
+
+			unmarshalers[env.Name] = append(unmarshalers[env.Name], config.InitConfig(env.Name))
+
 		}
 
 	}
