@@ -154,19 +154,3 @@ func (p PgEventStore) FindPendingTimeoutEvent(ctx context.Context) (*EventProces
 
 	return &handler, nil
 }
-
-//func UpdateTimeoutEvents(ctx context.Context, db *gorm.DB) error {
-//	const query = `
-//		update kitevent.event_processing_states
-//		set status = ?
-//		where status = ?
-//			and processable_at <= now()
-//	`
-//
-//	err := db.WithContext(ctx).Exec(query, EventProcessingStateStatusTimeout, EventProcessingStateStatusPending).Error
-//	if err != nil {
-//		return fmt.Errorf("failed to update timeout events: %w", err)
-//	}
-//
-//	return nil
-//}

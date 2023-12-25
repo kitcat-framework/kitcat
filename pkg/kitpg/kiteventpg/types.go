@@ -10,13 +10,13 @@ import (
 )
 
 type Event struct {
-	ID      int32          `gorm:"primaryKey"`
-	Payload datatypes.JSON `gorm:"type:jsonb"`
+	ID      int32
+	Payload datatypes.JSON
 
-	EventName string `gorm:"type:varchar(255)"`
+	EventName string
 
-	CreatedAt pgtype.Timestamp `gorm:"type:timestamp"`
-	UpdatedAt pgtype.Timestamp `gorm:"type:timestamp"`
+	CreatedAt pgtype.Timestamp
+	UpdatedAt pgtype.Timestamp
 }
 
 func (Event) TableName() string {
@@ -39,25 +39,25 @@ type EventProcessingState struct {
 	EventID int32
 	Event   *Event
 
-	Status EventProcessingStateStatus `gorm:"index"`
+	Status EventProcessingStateStatus
 	Error  *string
 
 	ConsumerOptionMaxRetries      int32
 	ConsumerOptionRetryIntervalMs int64
 	ConsumerOptionTimeoutMs       int64
 
-	CreatedAt     pgtype.Timestamp `gorm:"type:timestamp"`
-	UpdatedAt     pgtype.Timestamp `gorm:"type:timestamp"`
-	ProcessableAt pgtype.Timestamp `gorm:"type:timestamp"`
+	CreatedAt     pgtype.Timestamp
+	UpdatedAt     pgtype.Timestamp
+	ProcessableAt pgtype.Timestamp
 
-	RunAt       *pgtype.Timestamp `gorm:"type:timestamp"`
+	RunAt       *pgtype.Timestamp
 	RetryNumber int32
 	DurationMs  int64
-	TimeoutAt   *pgtype.Timestamp `gorm:"->;type:timestamp GENERATED ALWAYS AS (coalesce(pending_at, created_at) + (consumer_option_timeout_ms * interval '1 millisecond')) STORED;now();index"`
+	TimeoutAt   *pgtype.Timestamp
 
-	FailedAt  *pgtype.Timestamp `gorm:"type:timestamp"`
-	SuccessAt *pgtype.Timestamp `gorm:"type:timestamp"`
-	PendingAt *pgtype.Timestamp `gorm:"type:timestamp"`
+	FailedAt  *pgtype.Timestamp
+	SuccessAt *pgtype.Timestamp
+	PendingAt *pgtype.Timestamp
 }
 
 func (EventProcessingState) TableName() string {

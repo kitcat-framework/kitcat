@@ -37,7 +37,7 @@ type Config struct {
 	// request, including the body. A zero or negative value means
 	// there will be no timeout.
 	//
-	// Because ReadTimeout does not let Consumers make per-request
+	// Because ReadTimeout does not let handlers make per-request
 	// decisions on each request body's acceptable deadline or
 	// upload rate, most users will prefer to use
 	// ReadHeaderTimeout. It is valid to use them both.
@@ -54,7 +54,7 @@ type Config struct {
 	// WriteTimeout is the maximum duration before timing out
 	// writes of the response. It is reset whenever a new
 	// request's header is read. Like ReadTimeout, it does not
-	// let Consumers make decisions on a per-request basis.
+	// let handlers make decisions on a per-request basis.
 	// A zero or negative value means there will be no timeout.
 	WriteTimeout time.Duration `cfg:"write_timeout"`
 
