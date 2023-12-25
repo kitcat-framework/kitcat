@@ -12,7 +12,7 @@ type StringsParamExtractor interface {
 
 // ValueParamExtractor extract one value (a type) from http request.
 type ValueParamExtractor interface {
-	Extract(req *http.Request, valueOfTag string) (interface{}, error)
+	Extract(req *http.Request, valueOfTag string) (any, error)
 	Tag() string
 }
 
@@ -27,4 +27,5 @@ var StringsParamExtractors = []StringsParamExtractor{
 // ValuesParamExtractors extract one value (a type) from http request
 var ValuesParamExtractors = []ValueParamExtractor{
 	ContextExtractor{},
+	FileExtractor{},
 }

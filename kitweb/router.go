@@ -2,6 +2,7 @@ package kitweb
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"github.com/expectedsh/kitcat/kitslog"
 	"github.com/gorilla/mux"
@@ -9,6 +10,7 @@ import (
 	"net/http"
 	"os"
 	"reflect"
+	"runtime/debug"
 	"sync"
 )
 
@@ -48,6 +50,10 @@ func (r *Router) Route(method, path string, handler any) {
 		Methods(method).
 		Path(path).
 		Handler(httpHandler)
+}
+
+func (r *Router) RawRouter() *mux.Router {
+	return r.handler
 }
 
 func (r *Router) Use(handler ...any) {
@@ -98,7 +104,28 @@ type HandlerFunc[P any] func(r *Req[P]) Res
 func (h HandlerFunc[P]) ServeHTTP(module *Module) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		request := newRequest[P](r, module.paramsBinder, module.paramsValidator)
-		response := h(request)
+		response, err := func() (r Res, err error) {
+			defer func() {
+				err := recover()
+				if err != nil {
+					fmt.Println("--------------------------------------------")
+					fmt.Println("WARNING RECOVER FROM HTTP HANDLER")
+					fmt.Println()
+					fmt.Println(err)
+					fmt.Println(string(debug.Stack()))
+					fmt.Println()
+					fmt.Println("--------------------------------------------")
+
+					err = errors.New("panic")
+				}
+			}()
+
+			return h(request), nil
+		}()
+
+		if err != nil {
+			return
+		}
 
 		ctx := r.Context()
 		ctx = context.WithValue(ctx, ctxKeyEnginesValue, module.engines)

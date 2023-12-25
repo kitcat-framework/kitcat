@@ -30,12 +30,16 @@ type AppConfig struct {
 	environment      *Environment
 	LoggerOutput     string        `cfg:"_logger_output"`
 	HooksMaxLifetime time.Duration `cfg:"_hooks_max_lifetime"`
+	Host             string        `cfg:"host"`
 }
 
-func (c *AppConfig) InitConfig(_ string) ConfigUnmarshal {
+func (c *AppConfig) InitConfig(prefix string) ConfigUnmarshal {
 	viper.SetDefault("_hooks_max_lifetime", "10s")
 	viper.SetDefault("_logger_output", "stdout")
 	viper.SetDefault("_override_config_file", false)
+
+	prefix = prefix + ".kitcat"
+	viper.SetDefault(prefix+".host", "localhost:8080")
 
 	return func() error {
 		err := viper.Unmarshal(c, func(config *mapstructure.DecoderConfig) {
@@ -45,7 +49,7 @@ func (c *AppConfig) InitConfig(_ string) ConfigUnmarshal {
 			return fmt.Errorf("unable to unmarshal app config: %w", err)
 		}
 
-		return nil
+		return ConfigUnmarshalHandler(prefix, c, "unable to unmarshal app config: %w")()
 	}
 }
 
