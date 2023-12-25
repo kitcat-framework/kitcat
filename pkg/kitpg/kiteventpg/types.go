@@ -1,59 +1,102 @@
 package kiteventpg
 
 import (
+	"dario.cat/mergo"
+	"fmt"
+	"github.com/expectedsh/kitcat/pkg/kitpg/pgutils"
 	"github.com/jackc/pgx/v5/pgtype"
 	"gorm.io/datatypes"
+	"time"
 )
 
 type Event struct {
-	ID      int32          `gorm:"primaryKey"`
-	Payload datatypes.JSON `gorm:"type:jsonb"`
+	ID      int32
+	Payload datatypes.JSON
 
-	EventName string `gorm:"type:varchar(255)"`
+	EventName string
 
-	CreatedAt pgtype.Timestamp `gorm:"type:timestamp"`
-	UpdatedAt pgtype.Timestamp `gorm:"type:timestamp"`
+	CreatedAt pgtype.Timestamp
+	UpdatedAt pgtype.Timestamp
 }
 
 func (Event) TableName() string {
 	return "kitevent.events"
 }
 
-type EventHandlerResultStatus string
+type EventProcessingStateStatus string
 
 const (
-	EventHandlerResultStatusFailed   EventHandlerResultStatus = "FAILED"
-	EventHandlerResultStatusSuccess  EventHandlerResultStatus = "SUCCESS"
-	EventHandlerResultStatusPending  EventHandlerResultStatus = "PENDING"
-	EventHandlerResultStatusTakeable EventHandlerResultStatus = "TAKEABLE"
+	EventProcessingStateStatusFailed    EventProcessingStateStatus = "FAILED"
+	EventProcessingStateStatusSuccess   EventProcessingStateStatus = "SUCCESS"
+	EventProcessingStateStatusPending   EventProcessingStateStatus = "PENDING"
+	EventProcessingStateStatusAvailable EventProcessingStateStatus = "AVAILABLE"
 )
 
-type HandlerResult struct {
-	ID          int32
-	HandlerName string
+type EventProcessingState struct {
+	ID           int32
+	ConsumerName string
 
 	EventID int32
 	Event   *Event
 
-	Status EventHandlerResultStatus `gorm:"index"`
+	Status EventProcessingStateStatus
 	Error  *string
 
-	RetryNumber     int32
-	MaxRetries      int32
-	RetryIntervalMs int64
+	ConsumerOptionMaxRetries      int32
+	ConsumerOptionRetryIntervalMs int64
+	ConsumerOptionTimeoutMs       int64
 
-	CreatedAt     pgtype.Timestamp `gorm:"type:timestamp"`
-	UpdatedAt     pgtype.Timestamp `gorm:"type:timestamp"`
-	ProcessableAt pgtype.Timestamp `gorm:"type:timestamp"`
+	CreatedAt     pgtype.Timestamp
+	UpdatedAt     pgtype.Timestamp
+	ProcessableAt pgtype.Timestamp
 
-	RunAt             *pgtype.Timestamp `gorm:"type:timestamp"`
-	HandlerDurationMs int64
+	RunAt       *pgtype.Timestamp
+	RetryNumber int32
+	DurationMs  int64
+	TimeoutAt   *pgtype.Timestamp
 
-	FailedAt  *pgtype.Timestamp `gorm:"type:timestamp"`
-	SuccessAt *pgtype.Timestamp `gorm:"type:timestamp"`
-	PendingAt *pgtype.Timestamp `gorm:"type:timestamp"`
+	FailedAt  *pgtype.Timestamp
+	SuccessAt *pgtype.Timestamp
+	PendingAt *pgtype.Timestamp
 }
 
-func (HandlerResult) TableName() string {
-	return "kitevent.handler_results"
+func (EventProcessingState) TableName() string {
+	return "kitevent.event_processing_states"
+}
+
+// Next returns a new EventProcessingState with the same values as the current one
+// except for the following fields:
+// - Status: set to AVAILABLE
+// - Error: set to nil
+// - CreatedAt: set to the current time
+// - UpdatedAt: set to the current time
+// - ProcessableAt: set to the current time
+// - RunAt: set to nil
+// - RetryNumber: set to 0
+// - DurationMs: set to 0
+// - TimeoutAt: set to nil
+// - FailedAt: set to nil
+// - SuccessAt: set to nil
+// - PendingAt: set to nil
+func (c *EventProcessingState) Next() (*EventProcessingState, error) {
+	dest := EventProcessingState{}
+	err := mergo.Merge(&dest, c)
+	if err != nil {
+		return nil, fmt.Errorf("failed to clone event processing state: %w", err)
+	}
+
+	dest.ID = 0
+	dest.Status = EventProcessingStateStatusAvailable
+	dest.Error = nil
+	dest.CreatedAt = pgutils.TimestampUTC(time.Now())
+	dest.UpdatedAt = pgutils.TimestampUTC(time.Now())
+	dest.ProcessableAt = pgutils.TimestampUTC(time.Now())
+	dest.RunAt = nil
+	dest.DurationMs = 0
+	dest.TimeoutAt = nil
+	dest.FailedAt = nil
+	dest.SuccessAt = nil
+	dest.PendingAt = nil
+
+	return &dest, nil
 }

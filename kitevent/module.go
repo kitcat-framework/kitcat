@@ -59,37 +59,36 @@ func (m *Module) OnStart(ctx context.Context, app *kitcat.App) error {
 	return m.CurrentStore.OnStart(ctx)
 }
 
-func (m *Module) registerHandlers(h handlers) error {
-	if len(h.Handlers) == 0 {
+func (m *Module) registerHandlers(h consumers) error {
+	if len(h.Consumers) == 0 {
 		return nil
 	}
 
-	m.logger.Info("registering handlers", slog.Int("count", len(h.Handlers)))
+	m.logger.Info("registering consumers", slog.Int("count", len(h.Consumers)))
 
-	for _, handler := range h.Handlers {
-		if !IsHandler(handler) {
-			m.logger.Warn("invalid Handler, must implement method Handle(context.Context, kitevent.Event)",
-				slog.String("handler", reflect.TypeOf(handler).String()))
+	for _, consumer := range h.Consumers {
+		if !IsHandler(consumer) {
+			m.logger.Warn("invalid consumer, must implement method Consume(context.Context, <kitevent.Event>)",
+				slog.String("consumer", reflect.TypeOf(consumer).String()))
 			continue
 		}
 
-		eventName := reflect.New(reflect.ValueOf(handler).
-			MethodByName("Handle").
+		eventName := reflect.New(reflect.ValueOf(consumer).
+			MethodByName("Consume").
 			Type().In(1).Elem()).
 			Interface().(Event).
 			EventName()
 
-		m.logger.Info("registering handler",
-			slog.String("handler", handler.Name()),
+		m.logger.Info("registering consumer",
+			slog.String("consumer", consumer.Name()),
 			slog.String("event", eventName.Name))
-		m.CurrentStore.AddEventHandler(eventName, handler)
+		m.CurrentStore.AddConsumer(eventName, consumer)
 	}
 
 	return nil
 }
 
 func (m *Module) setCurrentStore(app *kitcat.App, st stores) error {
-	m.logger.Debug("stores", slog.Int("count", len(st.Stores)), slog.String("want", m.config.StoreName))
 	store, err := kitcat.UseImplementation(kitcat.UseImplementationParams[Store]{
 		ModuleName:                m.Name(),
 		ImplementationTerminology: "store",

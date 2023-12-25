@@ -13,7 +13,7 @@ import (
 )
 
 func IsHandler(handler kitcat.Nameable) bool {
-	handleFunc := reflect.ValueOf(handler).MethodByName("Handle")
+	handleFunc := reflect.ValueOf(handler).MethodByName("Consume")
 	if handleFunc.Kind() != reflect.Func {
 		return false
 	}
@@ -41,9 +41,9 @@ func IsHandler(handler kitcat.Nameable) bool {
 	return true
 }
 
-func PayloadToEvent(handler Handler, evt []byte) (Event, error) {
+func PayloadToEvent(handler Consumer, evt []byte) (Event, error) {
 	val := reflect.New(reflect.ValueOf(handler).
-		MethodByName("Handle").
+		MethodByName("Consume").
 		Type().In(1).Elem())
 
 	err := json.Unmarshal(evt, val.Interface())
@@ -60,15 +60,15 @@ func PayloadToEvent(handler Handler, evt []byte) (Event, error) {
 
 }
 
-type CallHandlerParams struct {
+type CallConsumerParams struct {
 	Ctx     context.Context
 	Event   Event
-	Handler Handler
+	Handler Consumer
 }
 
-func CallHandler(p CallHandlerParams) error {
-	handleFunc := reflect.ValueOf(p.Handler).MethodByName("Handle")
-	ret := handleFunc.Call([]reflect.Value{reflect.ValueOf(p.Ctx), reflect.ValueOf(p.Event)})
+func CallConsumer(p CallConsumerParams) error {
+	consumerFunc := reflect.ValueOf(p.Handler).MethodByName("Consume")
+	ret := consumerFunc.Call([]reflect.Value{reflect.ValueOf(p.Ctx), reflect.ValueOf(p.Event)})
 
 	if len(ret) > 0 && !ret[0].IsNil() {
 		return ret[0].Interface().(error)
@@ -77,20 +77,20 @@ func CallHandler(p CallHandlerParams) error {
 	return nil
 }
 
-type LocalCallHandlerParams struct {
+type LocalCallConsumerParams struct {
 	Ctx           context.Context
 	Event         Event
 	Producer      Producer
 	Opts          *ProducerOptions
-	Handler       Handler
+	Consumer      Consumer
 	Logger        *slog.Logger
 	IsProduceSync bool
 }
 
-func LocalCallHandler(p LocalCallHandlerParams) error {
+func LocalCallHandler(p LocalCallConsumerParams) error {
 	produceAgain := func() error {
-		if p.Handler.Options().RetryInterval != nil {
-			p.Opts.WithProduceAt(time.Now().Add(*p.Handler.Options().RetryInterval))
+		if p.Consumer.Options().RetryInterval != nil {
+			p.Opts.WithProduceAt(time.Now().Add(*p.Consumer.Options().RetryInterval))
 		}
 
 		if p.IsProduceSync {
@@ -100,7 +100,7 @@ func LocalCallHandler(p LocalCallHandlerParams) error {
 		}
 	}
 
-	handleFunc := reflect.ValueOf(p.Handler).MethodByName("Handle")
+	handleFunc := reflect.ValueOf(p.Consumer).MethodByName("Consume")
 	ret := handleFunc.Call([]reflect.Value{reflect.ValueOf(p.Ctx), reflect.ValueOf(p.Event)})
 
 	if len(ret) > 0 && !ret[0].IsNil() {
@@ -108,12 +108,12 @@ func LocalCallHandler(p LocalCallHandlerParams) error {
 
 		sl := slog.With(kitslog.Err(err), slog.String("event_name", p.Event.EventName().Name))
 
-		if err != nil && p.Handler.Options().MaxRetries != nil {
-			maxRetry := *p.Handler.Options().MaxRetries
+		if err != nil && p.Consumer.Options().MaxRetries != nil {
+			maxRetry := *p.Consumer.Options().MaxRetries
 			retryCount := p.Opts.RetryCount
 
 			if retryCount < maxRetry {
-				sl.Error("will retry Event because Handler gets an error",
+				sl.Error("will retry Event because Consumer gets an error",
 					slog.Int("current_retry_count", int(retryCount)),
 					slog.Int("max_retry", int(maxRetry)),
 				)

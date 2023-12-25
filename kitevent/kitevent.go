@@ -6,6 +6,7 @@ import (
 	"github.com/expectedsh/kitcat"
 	"github.com/expectedsh/kitcat/kitdi"
 	"github.com/google/uuid"
+	"github.com/samber/lo"
 	"time"
 )
 
@@ -20,14 +21,18 @@ type (
 		EventName() EventName
 	}
 
-	// HandlerOptions is the options for an Event Handler
-	HandlerOptions struct {
+	// ConsumerOptions is the options for an Event Consumer
+	ConsumerOptions struct {
 		// MaxRetries is the maximum number of retry for an Event
 		// The implementation may provide a dead letter queue to store the Event somewhere
 		MaxRetries *int32
 
 		// RetryInterval is the interval between each retry
 		RetryInterval *time.Duration
+
+		// The duration that the server will wait for a consumer for any individual event once it has been delivered.
+		// If a consumer don't respond before the timeout, the event will be retried if the MaxRetries is not reached.
+		Timeout *time.Duration
 	}
 
 	// ProducerOptions is the options for an Event Producer
@@ -58,22 +63,25 @@ type (
 		// ProduceSync is used to produce an Event synchronously, instead of using the queue
 		// The implementation must call the function synchronously
 		//
-		// An error is returned if one of the Handler returns an error
+		// An error is returned if one of the Consumer returns an error
+		//
+		// Generally to implement this method, you can use the LocalCallHandler function
+		// You should not use the store to produce the Event.
 		ProduceSync(ctx context.Context, event Event, opt *ProducerOptions) error
 	}
 
-	Handler interface {
-		Options() *HandlerOptions
+	Consumer interface {
+		Options() *ConsumerOptions
 		kitcat.Nameable
 	}
 
-	HandlerFunc[T Event] interface {
-		Handle(ctx context.Context, event T) error
+	ConsumerFunc[T Event] interface {
+		Consume(ctx context.Context, event T) error
 	}
 
 	Store interface {
 		Producer
-		AddEventHandler(eventName EventName, handler Handler)
+		AddConsumer(eventName EventName, consumer Consumer)
 		OnStart(ctx context.Context) error
 		OnStop(ctx context.Context) error
 		kitcat.Nameable
@@ -84,23 +92,30 @@ type (
 		Stores []Store `group:"kitevent.store"`
 	}
 
-	handlers struct {
+	consumers struct {
 		dig.In
-		Handlers []Handler `group:"kitevent.Handler"`
+		Consumers []Consumer `group:"kitevent.consumer"`
 	}
 )
 
-func NewHandlerOptions() *HandlerOptions {
-	return &HandlerOptions{}
+func NewConsumerOptions() *ConsumerOptions {
+	return &ConsumerOptions{
+		Timeout: lo.ToPtr(1 * time.Minute),
+	}
 }
 
-func (h *HandlerOptions) WithMaxRetry(maxRetry int32) *HandlerOptions {
+func (h *ConsumerOptions) WithMaxRetry(maxRetry int32) *ConsumerOptions {
 	h.MaxRetries = &maxRetry
 	return h
 }
 
-func (h *HandlerOptions) WithRetryInterval(retryInterval time.Duration) *HandlerOptions {
+func (h *ConsumerOptions) WithRetryInterval(retryInterval time.Duration) *ConsumerOptions {
 	h.RetryInterval = &retryInterval
+	return h
+}
+
+func (h *ConsumerOptions) WithTimeout(timeout time.Duration) *ConsumerOptions {
+	h.Timeout = &timeout
 	return h
 }
 
@@ -133,8 +148,8 @@ func NewEventName(name string) EventName {
 	}
 }
 
-func ProvideEventHandler(handler any) *kitdi.Annotation {
-	return kitdi.Annotate(handler, kitdi.Group("kitevent.Handler"), kitdi.As(new(Handler)))
+func ProvideConsumer(consumer any) *kitdi.Annotation {
+	return kitdi.Annotate(consumer, kitdi.Group("kitevent.consumer"), kitdi.As(new(Consumer)))
 }
 
 func ProvideStore(store any) *kitdi.Annotation {
