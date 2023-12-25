@@ -9,11 +9,18 @@ import (
 	"github.com/expectedsh/kitcat/kitevent"
 	"github.com/expectedsh/kitcat/kitslog"
 	"github.com/expectedsh/kitcat/pkg/kitpg/pgutils"
+	"github.com/golang-migrate/migrate/v4"
+	"github.com/golang-migrate/migrate/v4/database/postgres"
+	_ "github.com/golang-migrate/migrate/v4/source/file"
+	"github.com/jackc/pgx/v5/pgtype"
+	_ "github.com/lib/pq"
 	"github.com/samber/lo"
 	"github.com/spf13/viper"
 	"gorm.io/datatypes"
 	"gorm.io/gorm"
 	"log/slog"
+	"path/filepath"
+	"runtime"
 	"time"
 )
 
@@ -59,6 +66,43 @@ func New(db *gorm.DB, logger *slog.Logger, config *PostgresEventStoreConfig) *Po
 		cancelFunc: cancelFunc,
 		config:     config,
 	}
+}
+
+func (p PostgresEventStore) OnStart(ctx context.Context) error {
+	if p.config.CreateSchema {
+		err := p.db.Exec("CREATE SCHEMA IF NOT EXISTS kitevent;").Error
+		if err != nil {
+			return fmt.Errorf("failed to create kitevent schema: %w", err)
+		}
+	}
+
+	db, err := p.db.DB()
+	if err != nil {
+		return fmt.Errorf("failed to get db instance: %w", err)
+	}
+
+	driver, err := postgres.WithInstance(db, &postgres.Config{
+		SchemaName: "kitevent",
+	})
+
+	_, currentFile, _, _ := runtime.Caller(0)
+	libraryPath := filepath.Dir(currentFile)
+	migrationsPath := filepath.Join(libraryPath, "migrations")
+
+	m, err := migrate.NewWithDatabaseInstance(
+		"file://"+migrationsPath,
+		"postgres", driver)
+	if err != nil {
+		return fmt.Errorf("failed to create migration instance: %w", err)
+	}
+	if err := m.Up(); err != nil && !errors.Is(err, migrate.ErrNoChange) {
+		return err
+	}
+
+	go p.run(p.ctx)
+	go p.monitorTimeoutEvents(p.ctx)
+
+	return nil
 }
 
 func (p PostgresEventStore) Produce(ctx context.Context, event kitevent.Event, opt *kitevent.ProducerOptions) error {
@@ -107,7 +151,7 @@ func (p PostgresEventStore) Produce(ctx context.Context, event kitevent.Event, o
 			RetryNumber:                   1,
 			ConsumerOptionMaxRetries:      maxRetries,
 			ConsumerOptionRetryIntervalMs: retryIntervalMs,
-			ConsumerOptionTimeoutMs:       consumer.Options().ConsumeTimeout.Milliseconds(),
+			ConsumerOptionTimeoutMs:       consumer.Options().Timeout.Milliseconds(),
 			CreatedAt:                     pgutils.TimestampUTC(time.Now()),
 			UpdatedAt:                     pgutils.TimestampUTC(time.Now()),
 			ProcessableAt:                 pgutils.TimestampUTC(processableAt),
@@ -161,24 +205,6 @@ func (p PostgresEventStore) AddConsumer(eventName kitevent.EventName, handler ki
 	p.handlers[eventName] = append(p.handlers[eventName], handler)
 }
 
-func (p PostgresEventStore) OnStart(ctx context.Context) error {
-	if p.config.CreateSchema {
-		err := p.db.Exec("CREATE SCHEMA IF NOT EXISTS kitevent;").Error
-		if err != nil {
-			return fmt.Errorf("failed to create kitevent schema: %w", err)
-		}
-	}
-
-	err := p.db.WithContext(ctx).AutoMigrate(&Event{}, &EventProcessingState{})
-	if err != nil {
-		return fmt.Errorf("failed to migrate event models: %w", err)
-	}
-
-	go p.Run(p.ctx)
-
-	return nil
-}
-
 func (p PostgresEventStore) OnStop(_ context.Context) error {
 	p.cancelFunc()
 
@@ -189,12 +215,12 @@ func (p PostgresEventStore) Name() string {
 	return "postgres"
 }
 
-// Run is a blocking function that will loop over handler results to find those who are in EventProcessingStateStatusAvailable status.
+// run is a blocking function that will loop over handler results to find those who are in EventProcessingStateStatusAvailable status.
 // If one is found, it will call the consumer associated to the event and update the handler result accordingly.
 // If none is found, it will wait for 500ms and try again. Basic polling.
-func (p PostgresEventStore) Run(ctx context.Context) {
+func (p PostgresEventStore) run(ctx context.Context) {
 	for {
-		eventHandlerResult, err := p.getHandlerResult(ctx)
+		eventHandlerResult, err := p.nextEvent(ctx)
 		if err != nil || eventHandlerResult == nil {
 			time.Sleep(time.Millisecond * 500) // TODO: make it configurable
 			continue
@@ -217,7 +243,7 @@ func (p PostgresEventStore) Run(ctx context.Context) {
 			}
 
 			// TODO: process them in a pool to avoid having blocking handler
-			p.processHandlerResult(
+			p.processConsumer(
 				ctx,
 				event,
 				handler,
@@ -229,7 +255,57 @@ func (p PostgresEventStore) Run(ctx context.Context) {
 	}
 }
 
-func (p PostgresEventStore) processConsumerResult(
+func (p PostgresEventStore) monitorTimeoutEvents(ctx context.Context) {
+	for {
+		evtProcessingState, err := p.nextEventInTimeout(ctx)
+		if err != nil || evtProcessingState == nil {
+			time.Sleep(time.Millisecond * 500) // TODO: make it configurable
+			continue
+		}
+
+		l := p.logger.With(
+			slog.Int("event_id", int(evtProcessingState.EventID)),
+			slog.String("consumer", evtProcessingState.ConsumerName),
+			slog.String("event_name", evtProcessingState.Event.EventName))
+
+		nextEvtProcessingStateResult := []*EventProcessingState{}
+
+		evtProcessingState.UpdatedAt = pgutils.TimestampUTC(time.Now())
+		evtProcessingState.RunAt = lo.ToPtr(pgutils.TimestampUTC(time.Now()))
+		evtProcessingState.DurationMs = time.Since(evtProcessingState.PendingAt.Time).Milliseconds()
+		evtProcessingState.Error = lo.ToPtr("consumer timeout reached")
+		evtProcessingState.Status = EventProcessingStateStatusFailed
+		evtProcessingState.FailedAt = lo.ToPtr(pgutils.TimestampUTC(time.Now()))
+
+		if evtProcessingState.RetryNumber >= evtProcessingState.ConsumerOptionMaxRetries {
+			l.Error("timout reached, max retries reached",
+				slog.Int("retry_number", int(evtProcessingState.RetryNumber)),
+				slog.Int("max_retries", int(evtProcessingState.ConsumerOptionMaxRetries)),
+				slog.Int64("retry_interval_ms", evtProcessingState.ConsumerOptionRetryIntervalMs),
+			)
+		} else {
+			l.Error("timeout reached, will retry",
+				slog.Int("retry_number", int(evtProcessingState.RetryNumber)),
+				slog.Int("max_retries", int(evtProcessingState.ConsumerOptionMaxRetries)),
+				slog.Int64("retry_interval_ms", evtProcessingState.ConsumerOptionRetryIntervalMs),
+			)
+
+			newEvtProcessingState, _ := evtProcessingState.Next()
+
+			newEvtProcessingState.ProcessableAt = p.nextProcessableAt(evtProcessingState)
+			newEvtProcessingState.RetryNumber += 1
+
+			nextEvtProcessingStateResult = append(nextEvtProcessingStateResult, newEvtProcessingState)
+		}
+
+		err = p.store.SaveEventHandlers(ctx, append(nextEvtProcessingStateResult, evtProcessingState))
+		if err != nil {
+			l.Error("failed to save event consumer", kitslog.Err(err))
+		}
+	}
+}
+
+func (p PostgresEventStore) processConsumer(
 	ctx context.Context,
 	evt kitevent.Event,
 	consumer kitevent.Consumer,
@@ -253,6 +329,9 @@ func (p PostgresEventStore) processConsumerResult(
 		})
 	})
 
+	ctx, cancel := context.WithTimeout(ctx, time.Duration(evtProcessingState.ConsumerOptionTimeoutMs)*time.Millisecond)
+	defer cancel()
+
 	select {
 	case <-ctx.Done():
 		err = ctx.Err()
@@ -269,6 +348,11 @@ func (p PostgresEventStore) processConsumerResult(
 	evtProcessingState.UpdatedAt = pgutils.TimestampUTC(time.Now())
 	evtProcessingState.RunAt = lo.ToPtr(pgutils.TimestampUTC(time.Now()))
 	evtProcessingState.DurationMs = time.Since(startHandlerAt).Milliseconds()
+
+	if errors.Is(err, context.DeadlineExceeded) {
+		// should be handled by monitorTimeoutEvents
+		return
+	}
 
 	if err != nil {
 		evtProcessingState.Error = lo.ToPtr(err.Error())
@@ -288,22 +372,12 @@ func (p PostgresEventStore) processConsumerResult(
 				slog.Int64("retry_interval_ms", evtProcessingState.ConsumerOptionRetryIntervalMs),
 			)
 
-			nextEvtProcessingStateResult = append(nextEvtProcessingStateResult, &EventProcessingState{
-				ConsumerName:                  evtProcessingState.ConsumerName,
-				EventID:                       evtProcessingState.EventID,
-				Event:                         evtProcessingState.Event,
-				Status:                        EventProcessingStateStatusAvailable,
-				ConsumerOptionMaxRetries:      evtProcessingState.ConsumerOptionMaxRetries,
-				ConsumerOptionRetryIntervalMs: evtProcessingState.ConsumerOptionRetryIntervalMs,
-				ConsumerOptionTimeoutMs:       evtProcessingState.ConsumerOptionTimeoutMs,
-				CreatedAt:                     pgutils.TimestampUTC(time.Now()),
-				UpdatedAt:                     pgutils.TimestampUTC(time.Now()),
-				ProcessableAt:                 pgutils.TimestampUTC(time.Now().Add(time.Duration(evtProcessingState.ConsumerOptionRetryIntervalMs) * time.Millisecond)),
-				DurationMs:                    0,
-				RetryNumber:                   evtProcessingState.RetryNumber + 1,
-				FailedAt:                      nil,
-				SuccessAt:                     nil,
-			})
+			newEvtProcessingState, _ := evtProcessingState.Next()
+
+			newEvtProcessingState.ProcessableAt = p.nextProcessableAt(evtProcessingState)
+			newEvtProcessingState.RetryNumber += 1
+
+			nextEvtProcessingStateResult = append(nextEvtProcessingStateResult, newEvtProcessingState)
 		}
 
 	} else {
@@ -317,7 +391,12 @@ func (p PostgresEventStore) processConsumerResult(
 	}
 }
 
-func (p PostgresEventStore) getHandlerResult(ctx context.Context) (*EventProcessingState, error) {
+func (p PostgresEventStore) nextProcessableAt(evtProcessingState *EventProcessingState) pgtype.Timestamp {
+	return pgutils.TimestampUTC(time.Now().Add(
+		time.Duration(evtProcessingState.ConsumerOptionRetryIntervalMs) * time.Millisecond))
+}
+
+func (p PostgresEventStore) nextEvent(ctx context.Context) (*EventProcessingState, error) {
 	ctx, cancelCtx := context.WithTimeout(ctx, time.Second)
 	defer cancelCtx()
 
@@ -329,10 +408,22 @@ func (p PostgresEventStore) getHandlerResult(ctx context.Context) (*EventProcess
 	return evtHandlerResult, nil
 }
 
-func wrapResultAsChanErr(func() error) chan error {
+func (p PostgresEventStore) nextEventInTimeout(ctx context.Context) (*EventProcessingState, error) {
+	ctx, cancelCtx := context.WithTimeout(ctx, time.Second)
+	defer cancelCtx()
+
+	evtHandlerResult, err := p.store.FindPendingTimeoutEvent(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	return evtHandlerResult, nil
+}
+
+func wrapResultAsChanErr(f func() error) chan error {
 	errChan := make(chan error, 1)
 	go func() {
-		errChan <- nil
+		errChan <- f()
 	}()
 	return errChan
 }

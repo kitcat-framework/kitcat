@@ -30,9 +30,9 @@ type (
 		// RetryInterval is the interval between each retry
 		RetryInterval *time.Duration
 
-		// The duration that the server will wait for an consumer for any individual event once it has been delivered.
+		// The duration that the server will wait for a consumer for any individual event once it has been delivered.
 		// If a consumer don't respond before the timeout, the event will be retried if the MaxRetries is not reached.
-		ConsumeTimeout *time.Duration
+		Timeout *time.Duration
 	}
 
 	// ProducerOptions is the options for an Event Producer
@@ -100,7 +100,7 @@ type (
 
 func NewConsumerOptions() *ConsumerOptions {
 	return &ConsumerOptions{
-		ConsumeTimeout: lo.ToPtr(1 * time.Minute),
+		Timeout: lo.ToPtr(1 * time.Minute),
 	}
 }
 
@@ -111,6 +111,11 @@ func (h *ConsumerOptions) WithMaxRetry(maxRetry int32) *ConsumerOptions {
 
 func (h *ConsumerOptions) WithRetryInterval(retryInterval time.Duration) *ConsumerOptions {
 	h.RetryInterval = &retryInterval
+	return h
+}
+
+func (h *ConsumerOptions) WithTimeout(timeout time.Duration) *ConsumerOptions {
+	h.Timeout = &timeout
 	return h
 }
 

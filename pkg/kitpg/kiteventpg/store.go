@@ -10,6 +10,7 @@ import (
 type EventStoreStorage interface {
 	AddEvent(ctx context.Context, event Event, processor []*EventProcessingState) error
 	FindAvailableEvent(ctx context.Context) (*EventProcessingState, error)
+	FindPendingTimeoutEvent(ctx context.Context) (*EventProcessingState, error)
 	SaveEventHandlers(ctx context.Context, handler []*EventProcessingState) error
 }
 
@@ -53,12 +54,12 @@ func (p PgEventStore) FindAvailableEvent(ctx context.Context) (*EventProcessingS
 	tx := p.db.Session(&gorm.Session{PrepareStmt: false, Context: ctx})
 	const query = `
 		update kitevent.event_processing_states
-		set status = ?, pending_at = now()
+		set status = ?, pending_at = now() at time zone 'utc'
 		where id = (
 		  select id
 		  from kitevent.event_processing_states
 		  where status = ?
-			and processable_at <= now()
+			and processable_at <= now() at time zone 'utc'
 		  order by id
 		  for update skip locked
 		  limit 1
@@ -74,6 +75,58 @@ func (p PgEventStore) FindAvailableEvent(ctx context.Context) (*EventProcessingS
 	err := tx.Transaction(func(tx *gorm.DB) error {
 		err := tx.Raw(query, EventProcessingStateStatusPending,
 			EventProcessingStateStatusAvailable).Scan(&handler).Error
+		if err != nil {
+			return fmt.Errorf("failed to get event handler: %w", err)
+		}
+
+		if handler.ID == 0 {
+			return gorm.ErrRecordNotFound
+		}
+
+		err = tx.First(&evt, handler.EventID).Error
+		if err != nil {
+			return fmt.Errorf("failed to get event: %w", err)
+		}
+
+		return nil
+	})
+
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, nil
+		}
+		return nil, err
+	}
+
+	handler.Event = &evt
+
+	return &handler, nil
+}
+
+func (p PgEventStore) FindPendingTimeoutEvent(ctx context.Context) (*EventProcessingState, error) {
+	tx := p.db.Session(&gorm.Session{PrepareStmt: false, Context: ctx})
+	const query = `
+		update kitevent.event_processing_states
+		set status = ?, 
+		    updated_at = now() at time zone 'utc'
+		where id = (
+		  select id
+		  from kitevent.event_processing_states
+		  where status = ? and timeout_at <= now() at time zone 'utc'
+		  order by id
+		  for update skip locked
+		  limit 1
+		)
+		returning *;
+	`
+
+	var (
+		handler EventProcessingState
+		evt     Event
+	)
+
+	err := tx.Transaction(func(tx *gorm.DB) error {
+		err := tx.Raw(query, EventProcessingStateStatusFailed, EventProcessingStateStatusPending).Scan(&handler).Error
 		if err != nil {
 			return fmt.Errorf("failed to get event handler: %w", err)
 		}

@@ -54,7 +54,6 @@ func (m *Module) Configure(_ context.Context, app *kitcat.App) error {
 func (m *Module) Priority() uint8 { return 254 }
 
 func (m *Module) setCurrentFileSystem(a *kitcat.App, fs fileSystems) error {
-	fmt.Println("setCurrentFileSystem", fs)
 	implementation, err := kitcat.UseImplementation(kitcat.UseImplementationParams[FileSystem]{
 		ModuleName:                m.Name(),
 		ImplementationTerminology: "filesystem",
