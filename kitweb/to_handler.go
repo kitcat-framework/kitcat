@@ -363,8 +363,12 @@ func (r *Router) isHandlerFunc(functionType reflect.Type) error {
 }
 
 func (r *Router) isMiddlewareHandlerFunc(functionType reflect.Type) error {
+	if functionType.Kind() != reflect.Func {
+		return fmt.Errorf("invalid handler type type, should be a function: %s", functionType.String())
+	}
+
 	if !kitreflect.EnsureInOutLength(functionType, 2, 1) {
-		return fmt.Errorf("invalid handlerType length: %s", functionType.String())
+		return fmt.Errorf("invalid handler type length: %s", functionType.String())
 	}
 
 	err := isCtxParam(functionType)
@@ -378,7 +382,7 @@ func (r *Router) isMiddlewareHandlerFunc(functionType reflect.Type) error {
 	}
 
 	if !functionType.Out(0).AssignableTo(reflect.TypeOf((*Res)(nil)).Elem()) {
-		return fmt.Errorf("invalid handlerType return type: %s", functionType.String())
+		return fmt.Errorf("invalid handler type return type: %s", functionType.String())
 	}
 
 	return nil
@@ -387,15 +391,15 @@ func (r *Router) isMiddlewareHandlerFunc(functionType reflect.Type) error {
 // isCtxParam will check if the first parameter of the function is a *kitweb.Ctx
 func isCtxParam(functionType reflect.Type) error {
 	if functionType.In(0).Kind() != reflect.Ptr {
-		return fmt.Errorf("invalid handlerType 1st arg: %s", functionType.String())
+		return fmt.Errorf("invalid handler type 1st arg: %s", functionType.String())
 	}
 
 	if functionType.In(0).Elem().Kind() != reflect.Struct {
-		return fmt.Errorf("invalid handlerType 1st arg type: %s", functionType.String())
+		return fmt.Errorf("invalid handler type 1st arg type: %s", functionType.String())
 	}
 
 	if !strings.HasPrefix(functionType.In(0).String(), "*kitweb.Ctx") {
-		return fmt.Errorf("invalid handlerType 1st arg type: %s", functionType.String())
+		return fmt.Errorf("invalid handler type 1st arg type: %s", functionType.String())
 	}
 	return nil
 }
@@ -403,7 +407,7 @@ func isCtxParam(functionType reflect.Type) error {
 // isHttpFuncParam will check if the second parameter of the function is a http.HandlerFunc
 func isHttpFuncParam(functionType reflect.Type) error {
 	if !strings.HasPrefix(functionType.In(1).String(), "http.HandlerFunc") {
-		return fmt.Errorf("invalid handlerType 2nd arg type: %s", functionType.String())
+		return fmt.Errorf("invalid handler type 2nd arg type: %s", functionType.String())
 	}
 
 	return nil

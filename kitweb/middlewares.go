@@ -7,40 +7,19 @@ import (
 	"time"
 )
 
-type loggerResponseWriter struct {
-	http.ResponseWriter
+func MiddlewareRequestIDSetter(r *Ctx[struct{}], next http.HandlerFunc) Res {
+	id := r.Req.Header.Get("X-Request-Id")
 
-	statusCode int
-	body       []byte
-}
-
-func (l *loggerResponseWriter) WriteHeader(statusCode int) {
-	l.statusCode = statusCode
-	l.ResponseWriter.WriteHeader(statusCode)
-}
-
-func (l *loggerResponseWriter) Write(body []byte) (int, error) {
-	l.body = body
-	return l.ResponseWriter.Write(body)
-}
-
-func MiddlewareRequestIDSetter() Middleware[struct{}] {
-	return func(r *Ctx[struct{}], next http.HandlerFunc) Res {
-		id := r.Req.Header.Get("X-Request-Id")
-
-		if id == "" {
-			id = uuid.New().String()
-		}
-
-		r.SetRequestContextValue("request_id", id)
-		r.GetResponse().Header().Set("X-Request-ID", id)
-
-		next.ServeHTTP(r.GetResponse(), r.Req)
-
-		panic("bonjour")
-
-		return nil
+	if id == "" {
+		id = uuid.New().String()
 	}
+
+	r.SetRequestContextValue("request_id", id)
+	r.GetResponse().Header().Set("X-Request-ID", id)
+
+	next.ServeHTTP(r.GetResponse(), r.Req)
+
+	return nil
 }
 
 type MiddlewareLoggerParams struct {
@@ -50,15 +29,21 @@ type MiddlewareLoggerParams struct {
 func MiddlewareLogger() Middleware[MiddlewareLoggerParams] {
 	return func(r *Ctx[MiddlewareLoggerParams], next http.HandlerFunc) Res {
 		t := time.Now()
-		res := &loggerResponseWriter{ResponseWriter: r.GetResponse()}
 
-		next.ServeHTTP(res, r.Req)
+		next.ServeHTTP(r.res, r.Req)
 
-		r.Logger().Info("",
-			slog.String("status", http.StatusText(res.statusCode)),
-			slog.String("content_type", res.Header().Get("Content-Type")),
+		slogArgs := []any{
+			slog.String("content_type", r.Req.Header.Get("Content-Type")),
 			slog.String("request_id", r.Params().ID),
 			slog.Duration("duration", time.Since(t)),
+		}
+
+		if wres, ok := r.res.(*wrappedResponseWriter); ok {
+			slogArgs = append(slogArgs, slog.String("status", http.StatusText(wres.statusCode)))
+		}
+
+		r.Logger().Info("",
+			slogArgs...,
 		)
 
 		return nil

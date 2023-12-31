@@ -27,6 +27,12 @@ type (
 		Write(ctx context.Context, w http.ResponseWriter) error
 	}
 
+	DetailedMiddleware struct {
+		Order      *int
+		Middleware any
+		Name       string
+	}
+
 	HandlerFunc[P any] func(r *Ctx[P]) Res
 
 	Middleware[P any] func(r *Ctx[P], next http.HandlerFunc) Res
@@ -43,4 +49,16 @@ type (
 
 func ProvideHandler(handler any) *kitdi.Annotation {
 	return kitdi.Annotate(handler, kitdi.Group("kitweb.handlerType"), kitdi.As(new(Handler)))
+}
+
+func NewDetailedMiddleware(middleware any, name string, order ...int) *DetailedMiddleware {
+	var o *int = nil
+	if len(order) > 0 {
+		o = &order[0]
+	}
+	return &DetailedMiddleware{
+		Order:      o,
+		Middleware: middleware,
+		Name:       name,
+	}
 }
