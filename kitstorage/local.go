@@ -20,14 +20,18 @@ import (
 var fileBrowser string
 
 type LocalFileSystemConfig struct {
-	BasePath    string `cfg:"base_path"`
-	PathStorage string `cfg:"path_storage"`
+	BasePath                      string `cfg:"base_path"`
+	PathStorage                   string `cfg:"path_storage"`
+	AllowFileBrowser              bool   `cfg:"allow_file_browser"`
+	ShowPrivateFilesInFileBrowser bool   `cfg:"show_private_files_in_file_browser"`
 }
 
 func (l *LocalFileSystemConfig) InitConfig(prefix string) kitcat.ConfigUnmarshal {
 	prefix = fmt.Sprintf("%s.kitstorage.file_systems.local", prefix)
 	viper.SetDefault(prefix+".base_path", "./.fs_local/")
 	viper.SetDefault(prefix+".path_storage", "/storage")
+	viper.SetDefault(prefix+".allow_file_browser", true)
+	viper.SetDefault(prefix+".show_private_files_in_file_browser", false)
 
 	return kitcat.ConfigUnmarshalHandler(prefix, l, "unable to unmarshal local file system config: %w")
 }
@@ -194,7 +198,8 @@ func (l LocalFileSystem) Routes(r *kitweb.Router) {
 	r.RawRouter().PathPrefix(l.Config.PathStorage).Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		pathWithoutPrefix := r.URL.Path[len(l.Config.PathStorage):]
 
-		if r.URL.Path == l.Config.PathStorage || l.isDir(filepath.Join(l.Config.BasePath, pathWithoutPrefix)) {
+		if l.Config.AllowFileBrowser && r.URL.Path == l.Config.PathStorage || l.isDir(filepath.Join(l.Config.BasePath,
+			pathWithoutPrefix)) {
 			l.renderFileBrowser(pathWithoutPrefix, w, r)
 			return
 		}
@@ -234,7 +239,7 @@ func (l LocalFileSystem) renderFileBrowser(pathWithoutPrefix string, w http.Resp
 		filePath := filepath.Join(l.Config.BasePath, pathWithoutPrefix, file.Name())
 		meta := l.filesMetadata[filePath]
 
-		if !file.IsDir() && (file.Name() == l.filePathFileMetadata || !meta.Public) {
+		if !file.IsDir() && (file.Name() == l.filePathFileMetadata || !meta.Public && !l.Config.ShowPrivateFilesInFileBrowser) {
 			continue
 		}
 
