@@ -18,11 +18,11 @@ func JSONRender() *RenderJSONBuilder {
 	jsonBuilder.baseRenderBuilder = newBaseRenderBuilder[*RenderJSONBuilder](jsonBuilder)
 
 	return jsonBuilder.
-		WithContentType("application/json; charset=utf-8").
-		WithStatusCode(http.StatusOK)
+		ContentType("application/json; charset=utf-8").
+		StatusCode(http.StatusOK)
 }
 
-func (r *RenderJSONBuilder) WithData(data any) *RenderJSONBuilder {
+func (r *RenderJSONBuilder) Data(data any) *RenderJSONBuilder {
 	r.data = data
 	return r
 }
@@ -32,7 +32,7 @@ func (r *RenderJSONBuilder) Write(_ context.Context, w http.ResponseWriter) erro
 
 	var (
 		ve  ValidationError
-		err Error
+		err *Err
 	)
 
 	if errors.As(r.error, &ve) {
@@ -42,7 +42,12 @@ func (r *RenderJSONBuilder) Write(_ context.Context, w http.ResponseWriter) erro
 			response["global"] = ve.Global
 		}
 	} else if errors.As(r.error, &err) {
-		response["error"] = err.Error()
+		response["error"] = err.Message
+		response["code"] = err.Code
+
+		if err.Meta != nil {
+			response["meta"] = err.Meta
+		}
 	} else if r.error != nil {
 		response["error"] = InternalError(r.error)
 	}
