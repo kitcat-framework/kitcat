@@ -13,12 +13,12 @@ type baseRenderBuilder[T Res] struct {
 	ret T
 }
 
-func (r *baseRenderBuilder[T]) WithStatusCode(statusCode int) T {
+func (r *baseRenderBuilder[T]) StatusCode(statusCode int) T {
 	r.statusCode = statusCode
 	return r.ret
 }
 
-func (r *baseRenderBuilder[T]) WithHeaders(headers http.Header) T {
+func (r *baseRenderBuilder[T]) Headers(headers http.Header) T {
 	if r.headers == nil {
 		r.headers = http.Header{}
 	}
@@ -29,13 +29,13 @@ func (r *baseRenderBuilder[T]) WithHeaders(headers http.Header) T {
 	return r.ret
 }
 
-// WithError set the error of the response
-func (r *baseRenderBuilder[T]) WithError(error error) T {
+// Err set the error of the response
+func (r *baseRenderBuilder[T]) Err(error error) T {
 	r.error = error
 	return r.ret
 }
 
-func (r *baseRenderBuilder[T]) WithHeader(key, value string) T {
+func (r *baseRenderBuilder[T]) Header(key, value string) T {
 	if r.headers == nil {
 		r.headers = http.Header{}
 	}
@@ -43,8 +43,8 @@ func (r *baseRenderBuilder[T]) WithHeader(key, value string) T {
 	return r.ret
 }
 
-func (r *baseRenderBuilder[T]) WithContentType(contentType string) T {
-	return r.WithHeader("Content-Type", contentType)
+func (r *baseRenderBuilder[T]) ContentType(contentType string) T {
+	return r.Header("Content-Type", contentType)
 }
 
 func (r *baseRenderBuilder[T]) write(w http.ResponseWriter) {
@@ -55,8 +55,10 @@ func (r *baseRenderBuilder[T]) write(w http.ResponseWriter) {
 	}
 
 	var validationError ValidationError
-	if errors.As(r.error, &validationError) {
+	if errors.As(r.error, &validationError) && r.statusCode == http.StatusOK {
 		r.statusCode = http.StatusBadRequest
+	} else if r.error != nil && r.statusCode == http.StatusOK {
+		r.statusCode = http.StatusInternalServerError
 	}
 
 	w.WriteHeader(r.statusCode)

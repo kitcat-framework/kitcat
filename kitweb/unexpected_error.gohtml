@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Error Page</title>
+    <style>
+        body {
+            font-family: 'Arial', sans-serif;
+            background-color: #f4f4f4;
+            margin: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+        }
+
+        .card {
+            text-align: left;
+            padding: 20px;
+            background-color: #fff;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+            border-radius: 8px;
+            border: 1px solid #ddd;
+            width: 80%;
+            max-width: 80%; /* Set maximum width to 80% */
+        }
+
+        h1 {
+            color: #e74c3c;
+        }
+
+        p {
+            color: #333;
+        }
+
+        pre {
+            margin-top: 20px;
+            padding: 10px;
+            background-color: #ddd;
+            overflow-x: auto;
+            max-height: 300px;
+            overflow-y: auto;
+        }
+
+        .details {
+            margin-top: 20px;
+        }
+
+        .details p {
+            margin: 8px 0;
+        }
+
+        @media (max-width: 768px) {
+            .card {
+                width: 90%;
+            }
+        }
+    </style>
+</head>
+<body>
+<div class="card">
+    <h1>Oops! Something went wrong.</h1>
+    <p>We're sorry, but it seems there was an unexpected error. The issue has been logged, and we will look into it.</p>
+    <p>Please try again later or contact support if the problem persists.</p>
+
+    <div class="details">
+        {{if .URL}}
+            <p><strong>URL:</strong> {{.URL}}</p>
+        {{end}}
+        {{if .Path}}
+            <p><strong>Path:</strong> {{.Path}}</p>
+        {{end}}
+        {{if .Verb}}
+            <p><strong>Verb:</strong> {{.Verb}}</p>
+        {{end}}
+    </div>
+
+    {{if .StackTrace}}
+        <pre>{{.StackTrace}}</pre>
+    {{end}}
+</div>
+</body>
+</html>

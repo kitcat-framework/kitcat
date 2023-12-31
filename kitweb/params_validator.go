@@ -29,9 +29,9 @@ func (g GoPlaygroundParamsValidator) Validate(a any) error {
 		return err
 	}
 
-	validationError := ValidationError{error: err, Errors: make(map[string]*Error)}
+	validationError := ValidationError{error: err, Errors: make(map[string]*Err)}
 	for _, ve := range validationErrors {
-		validationError.Errors[ve.Field()] = NewError(ve.Tag(), ve.Translate(g.trans), nil)
+		validationError.Errors[ve.Field()] = Error(ve.Tag(), ve.Translate(g.trans), nil)
 	}
 
 	return validationError

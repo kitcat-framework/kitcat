@@ -84,6 +84,7 @@ func New() *App {
 	_ = a.container.Provide(func() kitdi.Invokable { return kitdi.Invokable{} })
 
 	a.loadConfigs()
+	a.Provides(a.config.environment)
 	a.init()
 
 	return a

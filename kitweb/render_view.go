@@ -25,25 +25,21 @@ func ViewRender(name string) *RenderViewBuilder {
 	renderViewBuilder.baseRenderBuilder = newBaseRenderBuilder[*RenderViewBuilder](renderViewBuilder)
 
 	return renderViewBuilder.
-		WithContentType("text/html; charset=utf-8").
-		WithStatusCode(http.StatusOK)
+		ContentType("text/html; charset=utf-8").
+		StatusCode(http.StatusOK)
 }
 
-type ctxKeyEngines struct{}
-
-var ctxKeyEnginesValue = ctxKeyEngines{}
-
-func (r *RenderViewBuilder) WithData(data any) *RenderViewBuilder {
+func (r *RenderViewBuilder) Data(data any) *RenderViewBuilder {
 	r.data = data
 	return r
 }
 
-func (r *RenderViewBuilder) WithEngine(engine string) *RenderViewBuilder {
+func (r *RenderViewBuilder) Engine(engine string) *RenderViewBuilder {
 	r.engine = engine
 	return r
 }
 
-func (r *RenderViewBuilder) WithLayout(layout string) *RenderViewBuilder {
+func (r *RenderViewBuilder) Layout(layout string) *RenderViewBuilder {
 	r.layout = &layout
 	return r
 }
@@ -57,20 +53,14 @@ type RenderData struct {
 	Err error
 }
 
-func (r RenderData) ValidationError() (*ValidationError, bool) {
-	var validationError *ValidationError
-	ok := errors.As(r.Err, &validationError)
-	return validationError, ok
-}
-
-func (r RenderData) Error() (*Error, bool) {
-	var err *Error
+func (r RenderData) Error() (*Err, bool) {
+	var err *Err
 	ok := errors.As(r.Err, &err)
 	return err, ok
 }
 
 func (r *RenderViewBuilder) Write(ctx context.Context, w http.ResponseWriter) error {
-	engine := ctx.Value(ctxKeyEnginesValue).(map[string]kittemplate.Engine)[r.engine]
+	engine := ctx.Value(ContextKeyEngines).(map[string]kittemplate.Engine)[r.engine]
 
 	opts := make([]kittemplate.EngineOption, 0)
 	if r.layout != nil {
