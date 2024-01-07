@@ -25,15 +25,15 @@ func init() {
 	kitcat.RegisterConfig(new(Config))
 }
 
-type Module struct {
+type KitCache struct {
 	config *Config
 	logger *slog.Logger
 
 	CurrentStore Store
 }
 
-func New(_ kitdi.Invokable, a *kitcat.App, config *Config) {
-	mod := &Module{
+func Module(a *kitcat.App, config *Config) {
+	mod := &KitCache{
 		config: config,
 		logger: slog.With(kitslog.Module("kitevent")),
 	}
@@ -45,21 +45,21 @@ func New(_ kitdi.Invokable, a *kitcat.App, config *Config) {
 	)
 }
 
-func (m *Module) Configure(_ context.Context, app *kitcat.App) error {
+func (m *KitCache) Configure(_ context.Context, app *kitcat.App) error {
 	app.Invoke(m.setCurrentStore)
 
 	return nil
 }
 
-func (m *Module) Priority() uint8 { return 0 }
+func (m *KitCache) Priority() uint8 { return 0 }
 
-func (m *Module) OnStart(ctx context.Context, app *kitcat.App) error {
+func (m *KitCache) OnStart(ctx context.Context, app *kitcat.App) error {
 	app.Invoke(m.registerHandlers)
 
 	return m.CurrentStore.OnStart(ctx)
 }
 
-func (m *Module) registerHandlers(h consumers) error {
+func (m *KitCache) registerHandlers(h consumers) error {
 	if len(h.Consumers) == 0 {
 		return nil
 	}
@@ -88,7 +88,7 @@ func (m *Module) registerHandlers(h consumers) error {
 	return nil
 }
 
-func (m *Module) setCurrentStore(app *kitcat.App, st stores) error {
+func (m *KitCache) setCurrentStore(app *kitcat.App, st stores) error {
 	store, err := kitcat.UseImplementation(kitcat.UseImplementationParams[Store]{
 		ModuleName:                m.Name(),
 		ImplementationTerminology: "store",
@@ -107,10 +107,10 @@ func (m *Module) setCurrentStore(app *kitcat.App, st stores) error {
 	return nil
 }
 
-func (m *Module) OnStop(ctx context.Context, _ *kitcat.App) error {
+func (m *KitCache) OnStop(ctx context.Context, _ *kitcat.App) error {
 	return m.CurrentStore.OnStop(ctx)
 }
 
-func (m *Module) Name() string {
+func (m *KitCache) Name() string {
 	return "kitevent"
 }

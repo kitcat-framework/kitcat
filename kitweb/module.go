@@ -5,12 +5,12 @@ import (
 	"crypto/tls"
 	"fmt"
 	"github.com/expectedsh/kitcat"
-	"github.com/expectedsh/kitcat/kitdi"
 	"github.com/expectedsh/kitcat/kitslog"
 	"github.com/expectedsh/kitcat/kittemplate"
 	"github.com/expectedsh/kitcat/kitweb/httpbind"
 	"github.com/spf13/viper"
 	"log/slog"
+	"math"
 	"net"
 	"net/http"
 	"time"
@@ -80,10 +80,12 @@ type Config struct {
 	PublicFolder string `cfg:"public_folder"`
 	PublicPath   string `cfg:"public_path"`
 
-	panicHandler      ExceptionHandlerFunc
-	noContentHandler  ExceptionHandlerFunc
-	notFoundHandler   ExceptionHandlerFunc
-	notAllowedHandler ExceptionHandlerFunc
+	PanicHandler      ExceptionHandlerFunc
+	NoContentHandler  ExceptionHandlerFunc
+	NotFoundHandler   ExceptionHandlerFunc
+	NotAllowedHandler ExceptionHandlerFunc
+
+	GlobalMiddlewares []any
 }
 
 func (c *Config) InitConfig(prefix string) kitcat.ConfigUnmarshal {
@@ -99,10 +101,15 @@ func (c *Config) InitConfig(prefix string) kitcat.ConfigUnmarshal {
 	viper.SetDefault(prefix+".public_folder", "public")
 	viper.SetDefault(prefix+".public_path", "/public/")
 
-	c.panicHandler = panicHandler
-	c.noContentHandler = noContentHandler
-	c.notFoundHandler = notFoundHandler
-	c.notAllowedHandler = methodNotAllowedHandler
+	c.PanicHandler = panicHandler
+	c.NoContentHandler = noContentHandler
+	c.NotFoundHandler = notFoundHandler
+	c.NotAllowedHandler = methodNotAllowedHandler
+
+	c.GlobalMiddlewares = []any{
+		NewDetailedMiddleware(MiddlewareRequestIDSetter, "request_id", math.MaxInt32),
+		NewDetailedMiddleware(MiddlewareLogger(), "logger", math.MaxInt32-1),
+	}
 
 	return kitcat.ConfigUnmarshalHandler(prefix, c, "unable to unmarshal kitweb config: %w")
 }
@@ -111,7 +118,7 @@ func init() {
 	kitcat.RegisterConfig(new(Config))
 }
 
-type Module struct {
+type KitWeb struct {
 	config       *Config
 	globalRouter *Router
 
@@ -127,9 +134,9 @@ type Module struct {
 	env *kitcat.Environment
 }
 
-// New create the kitweb module
-func New(_ kitdi.Invokable, config *Config, a *kitcat.App, env *kitcat.Environment) {
-	w := &Module{
+// Module provide a web module
+func Module(config *Config, a *kitcat.App, env *kitcat.Environment) {
+	w := &KitWeb{
 		config:  config,
 		logger:  slog.With(kitslog.Module("kitweb")),
 		engines: map[string]kittemplate.Engine{},
@@ -154,10 +161,11 @@ func New(_ kitdi.Invokable, config *Config, a *kitcat.App, env *kitcat.Environme
 
 }
 
-func (w *Module) OnStart(_ context.Context, app *kitcat.App) error {
+func (w *KitWeb) OnStart(_ context.Context, app *kitcat.App) error {
 	app.Invoke(w.registerHandlers)
 	w.setTemplateEngine(app)
-	w.httpServer = w.buildHTPServerFromConfig()
+
+	w.httpServer = w.buildHTTPServerFromConfig()
 
 	addr := w.config.Addr
 	if addr == "" {
@@ -176,17 +184,17 @@ func (w *Module) OnStart(_ context.Context, app *kitcat.App) error {
 	return nil
 }
 
-func (w *Module) OnStop(ctx context.Context, _ *kitcat.App) error {
+func (w *KitWeb) OnStop(ctx context.Context, _ *kitcat.App) error {
 	w.logger.Info("stopping http server")
 
 	return w.httpServer.Shutdown(ctx)
 }
 
-func (w *Module) Name() string {
+func (w *KitWeb) Name() string {
 	return "kitweb"
 }
 
-func (w *Module) buildHTPServerFromConfig() *http.Server {
+func (w *KitWeb) buildHTTPServerFromConfig() *http.Server {
 	srv := &http.Server{Handler: w.globalRouter.handler}
 
 	if w.config.TLSConfig != nil {
@@ -216,7 +224,7 @@ func (w *Module) buildHTPServerFromConfig() *http.Server {
 	return srv
 }
 
-func (w *Module) setTemplateEngine(app *kitcat.App) {
+func (w *KitWeb) setTemplateEngine(app *kitcat.App) {
 	app.Invoke(func(engines kittemplate.Engines) {
 		// if no template engine is provided, we provide the default one
 		if len(engines.Engines) == 0 {
@@ -233,7 +241,7 @@ func (w *Module) setTemplateEngine(app *kitcat.App) {
 	})
 }
 
-func (w *Module) registerHandlers(handlers handlers) {
+func (w *KitWeb) registerHandlers(handlers handlers) {
 	if len(handlers.Handlers) == 0 {
 		return
 	}
@@ -241,18 +249,21 @@ func (w *Module) registerHandlers(handlers handlers) {
 	w.logger.Info("registering handlers", slog.Int("count", len(handlers.Handlers)))
 
 	w.globalRouter.handler.NotFoundHandler = http.HandlerFunc(func(rw http.ResponseWriter, req *http.Request) {
-		w.config.notFoundHandler(rw, req, nil)
+		w.config.NotFoundHandler(rw, req, nil)
 	})
 
 	w.globalRouter.handler.MethodNotAllowedHandler = http.HandlerFunc(func(rw http.ResponseWriter, req *http.Request) {
-		w.config.notAllowedHandler(rw, req, nil)
+		w.config.NotAllowedHandler(rw, req, nil)
 	})
 
+	w.logger.Info("global middlewares", slog.Int("count", len(w.config.GlobalMiddlewares)))
+
 	for _, h := range handlers.Handlers {
-		w.logger.Info("registering handlerType", slog.String("handlerType", h.Name()))
+		w.logger.Info("registering handler", slog.String("handler", h.Name()))
 
 		newRouter(h.Name(), w, w.env, func(r *Router) {
 			r.handler = w.globalRouter.handler.PathPrefix("/").Subrouter()
+			r.Use(w.config.GlobalMiddlewares...)
 		})
 
 		h.Routes(w.globalRouter)

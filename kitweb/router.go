@@ -46,13 +46,13 @@ type Router struct {
 	logger *slog.Logger
 
 	handler   *mux.Router
-	webModule *Module
+	webModule *KitWeb
 	env       *kitcat.Environment
 
 	middlewares orderedMiddlewares
 }
 
-func newRouter(name string, m *Module, env *kitcat.Environment, routerModifier func(r *Router)) *Router {
+func newRouter(name string, m *KitWeb, env *kitcat.Environment, routerModifier func(r *Router)) *Router {
 	r := &Router{
 		handler:   mux.NewRouter(),
 		logger:    slog.With(kitslog.Module("router"), slog.String("name", name)),
@@ -207,6 +207,8 @@ func (r *Router) initPublicFolder() {
 
 	if folder != "" {
 		publicHandler := http.StripPrefix(path, http.FileServer(http.Dir(folder)))
-		r.handler.PathPrefix(path).Handler(publicHandler)
+		r.handler.PathPrefix(path).Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			publicHandler.ServeHTTP(w, r)
+		}))
 	}
 }

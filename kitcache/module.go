@@ -24,15 +24,15 @@ func init() {
 	kitcat.RegisterConfig(new(Config))
 }
 
-type Module struct {
+type KitCache struct {
 	Config       *Config
 	CurrentStore Store
 
 	logger *slog.Logger
 }
 
-func New(_ kitdi.Invokable, config *Config, app *kitcat.App) {
-	mod := &Module{
+func Module(config *Config, app *kitcat.App) {
+	mod := &KitCache{
 		Config: config,
 		logger: slog.With(kitslog.Module("kitcache")),
 	}
@@ -43,15 +43,15 @@ func New(_ kitdi.Invokable, config *Config, app *kitcat.App) {
 	)
 }
 
-func (m *Module) Configure(_ context.Context, app *kitcat.App) error {
+func (m *KitCache) Configure(_ context.Context, app *kitcat.App) error {
 	app.Invoke(m.setCurrentStore)
 
 	return nil
 }
 
-func (m *Module) Priority() uint8 { return 0 }
+func (m *KitCache) Priority() uint8 { return 0 }
 
-func (m *Module) setCurrentStore(a *kitcat.App, s stores) error {
+func (m *KitCache) setCurrentStore(a *kitcat.App, s stores) error {
 	implementation, err := kitcat.UseImplementation(kitcat.UseImplementationParams[Store]{
 		ModuleName:                m.Name(),
 		ImplementationTerminology: "store",
@@ -69,6 +69,6 @@ func (m *Module) setCurrentStore(a *kitcat.App, s stores) error {
 	return nil
 }
 
-func (m *Module) Name() string {
+func (m *KitCache) Name() string {
 	return "kitmail"
 }

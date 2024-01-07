@@ -279,13 +279,13 @@ func (r *Router) postCallHandler(p postCallHandlerParams) {
 
 	if p.panicked == nil && p.response == nil && p.handlerType.isHandler() {
 		// no content because a handlerType must return something (a middleware can return nothing)
-		r.webModule.config.noContentHandler(p.rw, p.req, nil)
+		r.webModule.config.NoContentHandler(p.rw, p.req, nil)
 		return
 	}
 
 	if p.panicked != nil {
 		// a panic occurred
-		r.webModule.config.panicHandler(p.rw, p.req, p.panicked)
+		r.webModule.config.PanicHandler(p.rw, p.req, p.panicked)
 		return
 	}
 
@@ -295,7 +295,7 @@ func (r *Router) postCallHandler(p postCallHandlerParams) {
 	}
 
 	if err := p.response.Write(ctx, p.rw); err != nil {
-		r.webModule.config.panicHandler(p.rw, p.req, errors.Join(err, errWrite))
+		r.webModule.config.PanicHandler(p.rw, p.req, errors.Join(err, errWrite))
 		return
 	}
 

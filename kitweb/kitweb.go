@@ -28,6 +28,7 @@ type (
 	}
 
 	DetailedMiddleware struct {
+		// Order is the order of the middleware, the higher the order, the first it will be executed
 		Order      *int
 		Middleware any
 		Name       string

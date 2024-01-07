@@ -24,15 +24,15 @@ func init() {
 	kitcat.RegisterConfig(new(Config))
 }
 
-type Module struct {
+type KitMail struct {
 	Config *Config
 
 	CurrentSender Sender
 	logger        *slog.Logger
 }
 
-func New(_ kitdi.Invokable, app *kitcat.App, config *Config) {
-	mod := &Module{
+func Module(app *kitcat.App, config *Config) {
+	mod := &KitMail{
 		Config: config,
 		logger: slog.With(kitslog.Module("kitmail")),
 	}
@@ -44,15 +44,15 @@ func New(_ kitdi.Invokable, app *kitcat.App, config *Config) {
 
 }
 
-func (m *Module) Configure(_ context.Context, app *kitcat.App) error {
+func (m *KitMail) Configure(_ context.Context, app *kitcat.App) error {
 	app.Invoke(m.setCurrentSender)
 
 	return nil
 }
 
-func (m *Module) Priority() uint8 { return 0 }
+func (m *KitMail) Priority() uint8 { return 0 }
 
-func (m *Module) setCurrentSender(a *kitcat.App, s senders) error {
+func (m *KitMail) setCurrentSender(a *kitcat.App, s senders) error {
 	implementation, err := kitcat.UseImplementation(kitcat.UseImplementationParams[Sender]{
 		ModuleName:                m.Name(),
 		ImplementationTerminology: "sender",
@@ -70,6 +70,6 @@ func (m *Module) setCurrentSender(a *kitcat.App, s senders) error {
 	return nil
 }
 
-func (m *Module) Name() string {
+func (m *KitMail) Name() string {
 	return "kitmail"
 }

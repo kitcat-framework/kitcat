@@ -18,6 +18,7 @@ type unexpectedErrorData struct {
 	Verb string
 
 	StackTrace string
+	Error      error
 }
 
 func panicHandler(rw http.ResponseWriter, req *http.Request, err error) {
@@ -35,8 +36,9 @@ func panicHandler(rw http.ResponseWriter, req *http.Request, err error) {
 		_ = JSONRender().Err(e).StatusCode(http.StatusInternalServerError).Write(req.Context(), rw)
 	} else {
 		data := unexpectedErrorData{
-			URL:  req.URL.String(),
-			Verb: req.Method,
+			URL:   req.URL.String(),
+			Verb:  req.Method,
+			Error: err,
 		}
 
 		if !env.Equal(kitcat.EnvironmentProduction) && errors.As(err, &stack) {

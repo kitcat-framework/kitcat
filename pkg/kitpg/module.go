@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"github.com/expectedsh/kitcat"
-	"github.com/expectedsh/kitcat/kitdi"
 	"github.com/expectedsh/kitcat/kitevent"
 	"github.com/expectedsh/kitcat/pkg/kitpg/kiteventpg"
 	"github.com/spf13/viper"
@@ -45,13 +44,13 @@ func init() {
 	kitcat.RegisterConfig(new(Config))
 }
 
-type Module struct {
+type KitPostgres struct {
 	config     *Config
 	connection *gorm.DB
 }
 
-func New(_ kitdi.Invokable, app *kitcat.App, config *Config) {
-	m := &Module{config: config}
+func Module(app *kitcat.App, config *Config) {
+	m := &KitPostgres{config: config}
 
 	app.Provides(
 		kitcat.ProvideConfigurableModule(m),
@@ -59,7 +58,7 @@ func New(_ kitdi.Invokable, app *kitcat.App, config *Config) {
 	)
 }
 
-func (m *Module) Configure(_ context.Context, app *kitcat.App) error {
+func (m *KitPostgres) Configure(_ context.Context, app *kitcat.App) error {
 
 	gc := m.config.GormConfig
 	if gc == nil {
@@ -87,9 +86,9 @@ func (m *Module) Configure(_ context.Context, app *kitcat.App) error {
 	return nil
 }
 
-func (m *Module) Priority() uint8 { return math.MaxUint8 }
+func (m *KitPostgres) Priority() uint8 { return math.MaxUint8 }
 
-func (m *Module) Name() string {
+func (m *KitPostgres) Name() string {
 	return "kitpg"
 }
 

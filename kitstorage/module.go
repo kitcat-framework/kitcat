@@ -26,15 +26,15 @@ func init() {
 	kitcat.RegisterConfig(new(Config))
 }
 
-type Module struct {
+type KitStorage struct {
 	Config            *Config
 	CurrentFileSystem FileSystem
 
 	logger *slog.Logger
 }
 
-func New(_ kitdi.Invokable, cfg *Config, app *kitcat.App) {
-	mod := &Module{
+func Module(cfg *Config, app *kitcat.App) {
+	mod := &KitStorage{
 		Config: cfg,
 		logger: slog.With(kitslog.Module("kitstorage")),
 	}
@@ -45,15 +45,15 @@ func New(_ kitdi.Invokable, cfg *Config, app *kitcat.App) {
 	)
 }
 
-func (m *Module) Configure(_ context.Context, app *kitcat.App) error {
+func (m *KitStorage) Configure(_ context.Context, app *kitcat.App) error {
 	app.Invoke(m.setCurrentFileSystem)
 
 	return nil
 }
 
-func (m *Module) Priority() uint8 { return 254 }
+func (m *KitStorage) Priority() uint8 { return 254 }
 
-func (m *Module) setCurrentFileSystem(a *kitcat.App, fs fileSystems) error {
+func (m *KitStorage) setCurrentFileSystem(a *kitcat.App, fs fileSystems) error {
 	implementation, err := kitcat.UseImplementation(kitcat.UseImplementationParams[FileSystem]{
 		ModuleName:                m.Name(),
 		ImplementationTerminology: "filesystem",
@@ -76,4 +76,4 @@ func (m *Module) setCurrentFileSystem(a *kitcat.App, fs fileSystems) error {
 	return nil
 }
 
-func (m *Module) Name() string { return "kitstorage" }
+func (m *KitStorage) Name() string { return "kitstorage" }

@@ -2,6 +2,7 @@ package kittemplate
 
 import (
 	"fmt"
+	"github.com/Masterminds/sprig/v3"
 	"github.com/expectedsh/kitcat"
 	"github.com/spf13/viper"
 	"html/template"
@@ -50,18 +51,22 @@ func init() {
 	kitcat.RegisterConfig(new(GoHTMLEngineConfig))
 }
 
+// createTemplateFunc is used to create a template
+// In production mode, the template will be cached
+type createTemplateFunc func() (*template.Template, error)
+
 type GoHTMLEngine struct {
 	*GoHTMLEngineConfig
 
-	templates       map[string]*template.Template
-	layoutTemplates map[string]*template.Template
+	templates       map[string]createTemplateFunc
+	layoutTemplates map[string]createTemplateFunc
 }
 
 func NewGoHTMLTemplateEngine(config *GoHTMLEngineConfig) (*GoHTMLEngine, error) {
 	p := &GoHTMLEngine{
 		GoHTMLEngineConfig: config,
-		layoutTemplates:    make(map[string]*template.Template),
-		templates:          make(map[string]*template.Template),
+		layoutTemplates:    make(map[string]createTemplateFunc),
+		templates:          make(map[string]createTemplateFunc),
 	}
 
 	if err := p.init(); err != nil {
@@ -77,18 +82,27 @@ func (p *GoHTMLEngine) Execute(writer io.Writer, name string, applyOptions ...En
 		applyOpt(&opts)
 	}
 
-	var tmpl *template.Template
+	var (
+		tmpl *template.Template
+		err  error
+	)
 	if opts.Layout != nil {
-		tmpl = p.layoutTemplates[filepath.Join(*opts.Layout, name)]
+		tmpl, err = p.layoutTemplates[filepath.Join(*opts.Layout, name)]()
+		if err != nil {
+			return fmt.Errorf("failed to execute layout template %s: %w", name, err)
+		}
 	} else {
-		tmpl = p.templates[name]
+		tmpl, err = p.templates[name]()
+		if err != nil {
+			return fmt.Errorf("failed to execute template %s: %w", name, err)
+		}
 	}
 
 	if tmpl == nil {
 		return fmt.Errorf("template %s not found", name)
 	}
 
-	err := tmpl.Execute(writer, opts.Data)
+	err = tmpl.Execute(writer, opts.Data)
 	if err != nil {
 		return fmt.Errorf("failed to execute template %s: %w", name, err)
 	}
@@ -101,12 +115,11 @@ func (p *GoHTMLEngine) Name() string {
 }
 
 func (p *GoHTMLEngine) init() error {
+
 	dir, err := os.Getwd()
 	if err != nil {
 		return fmt.Errorf("failed to get current directory: %w", err)
 	}
-
-	p.templates = make(map[string]*template.Template)
 
 	layoutFiles, includeFiles, partialsFiles, err := p.getFiles(dir)
 	if err != nil {
@@ -124,11 +137,14 @@ func (p *GoHTMLEngine) init() error {
 		files := append(partialsFiles, file)
 		fileName := fileNameWithoutExtension(filepath.Base(file))
 
-		includeFileTemplate, err := template.New(filepath.Base(file)).ParseFiles(files...)
-		if err != nil {
-			return fmt.Errorf("failed to parse template %s: %w", file, err)
+		p.templates[fileName] = func() (*template.Template, error) {
+			includeFileTemplate, err := withFunc(template.New(filepath.Base(file))).ParseFiles(files...)
+			if err != nil {
+				return nil, fmt.Errorf("failed to parse template %s: %w", file, err)
+			}
+
+			return includeFileTemplate, nil
 		}
-		p.templates[fileName] = includeFileTemplate
 
 		for _, layoutFile := range layoutFiles {
 			fileName := filepath.Join(
@@ -137,23 +153,29 @@ func (p *GoHTMLEngine) init() error {
 
 			files := append(partialsFiles, layoutFile, file)
 
-			layoutTemplate, err := template.New("layout").Parse(fmt.Sprintf(LayoutTemplate,
+			layoutTemplate, err := withFunc(template.New("layout")).Parse(fmt.Sprintf(LayoutTemplate,
 				fileNameWithoutExtension(filepath.Base(layoutFile))))
 
 			if err != nil {
 				return fmt.Errorf("failed to parse layout template %s for file %s: %w", layoutFile, file, err)
 			}
 
-			tmpl, err := layoutTemplate.ParseFiles(files...)
-			if err != nil {
-				return fmt.Errorf("failed to parse %s for file %s: %w", layoutFile, file, err)
-			}
+			p.layoutTemplates[fileName] = func() (*template.Template, error) {
+				tmpl, err := withFunc(layoutTemplate).ParseFiles(files...)
+				if err != nil {
+					return nil, fmt.Errorf("failed to parse %s for file %s: %w", layoutFile, file, err)
+				}
 
-			p.layoutTemplates[fileName] = tmpl
+				return tmpl, nil
+			}
 		}
 	}
 
 	return nil
+}
+
+func withFunc(tmpl *template.Template) *template.Template {
+	return tmpl.Funcs(sprig.FuncMap())
 }
 
 func (p *GoHTMLEngine) getFiles(dir string) (

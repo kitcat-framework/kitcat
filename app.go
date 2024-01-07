@@ -349,6 +349,12 @@ func (a *App) Invoke(function any, opts ...dig.InvokeOption) {
 	}
 }
 
+func (a *App) Modules(invokers ...any) {
+	for _, f := range invokers {
+		a.Invoke(f)
+	}
+}
+
 func (a *App) init() {
 	a.Provides(a)
 

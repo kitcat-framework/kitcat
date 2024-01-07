@@ -74,6 +74,11 @@
         {{if .Verb}}
             <p><strong>Verb:</strong> {{.Verb}}</p>
         {{end}}
+
+        {{if .Error}}
+            <p><strong>Error:</strong></p>
+            <pre>{{.Error}}</pre>
+        {{end}}
     </div>
 
     {{if .StackTrace}}

@@ -222,7 +222,7 @@ func (p PostgresEventStore) run(ctx context.Context) {
 	for {
 		eventHandlerResult, err := p.nextEvent(ctx)
 		if err != nil || eventHandlerResult == nil {
-			time.Sleep(time.Millisecond * 500) // TODO: make it configurable
+			time.Sleep(p.config.PollInterval)
 			continue
 		}
 
@@ -259,7 +259,7 @@ func (p PostgresEventStore) monitorTimeoutEvents(ctx context.Context) {
 	for {
 		evtProcessingState, err := p.nextEventInTimeout(ctx)
 		if err != nil || evtProcessingState == nil {
-			time.Sleep(time.Millisecond * 500) // TODO: make it configurable
+			time.Sleep(p.config.PollInterval)
 			continue
 		}
 
