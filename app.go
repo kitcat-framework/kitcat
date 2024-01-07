@@ -179,7 +179,7 @@ func (a *App) loadConfigs() {
 
 	var env Environment
 	if err := env.UnmarshalText([]byte(envStr)); err != nil {
-		kitexit.Abnormal(fmt.Errorf("kitcat: invalid environment: %w", err))
+		kitexit.Abnormal(fmt.Errorf("kitcat: invalid environment: %s", envStr))
 	}
 
 	configOverrideStr := viper.GetString("_override_config_file")
