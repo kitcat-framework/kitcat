@@ -207,10 +207,8 @@ func (a *App) loadConfigs() {
 		}
 	} else {
 		if env.Equal(EnvironmentProduction) {
-			return
-		}
-
-		if configOverride {
+			// do nothing
+		} else if configOverride {
 			if err := viper.WriteConfigAs("config.yaml"); err != nil {
 				kitexit.Abnormal(fmt.Errorf("kitcat: error writing config file: %w", err))
 			}
@@ -262,7 +260,6 @@ func (a *App) loadConfigs() {
 		}
 	}
 
-	// set manually the environment
 	a.config.environment = &env
 
 	for _, config := range configsAny {
@@ -370,6 +367,7 @@ func (a *App) init() {
 		out = os.Stdout
 	}
 
+	fmt.Println(a.config.environment)
 	logger = GetLoggerFunc(a.config.environment, out)
 
 	slog.SetDefault(logger)

@@ -1,6 +1,8 @@
 package kitcat
 
-import "errors"
+import (
+	"errors"
+)
 
 var (
 	ErrInvalidEnvironment = errors.New("invalid environment")
