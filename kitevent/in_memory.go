@@ -2,7 +2,7 @@ package kitevent
 
 import (
 	"context"
-	"github.com/expectedsh/kitcat/kitslog"
+	"github.com/kitcat-framework/kitcat/kitslog"
 	"log/slog"
 	"time"
 )

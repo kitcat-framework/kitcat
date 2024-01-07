@@ -3,9 +3,9 @@ package kitevent
 import (
 	"context"
 	"github.com/expectedsh/dig"
-	"github.com/expectedsh/kitcat"
-	"github.com/expectedsh/kitcat/kitdi"
 	"github.com/google/uuid"
+	"github.com/kitcat-framework/kitcat"
+	"github.com/kitcat-framework/kitcat/kitdi"
 	"github.com/samber/lo"
 	"time"
 )

@@ -2,8 +2,8 @@ package kitmail
 
 import (
 	"fmt"
-	"github.com/expectedsh/kitcat"
-	"github.com/expectedsh/kitcat/kitslog"
+	"github.com/kitcat-framework/kitcat"
+	"github.com/kitcat-framework/kitcat/kitslog"
 	"github.com/spf13/viper"
 	"log/slog"
 	"net/smtp"

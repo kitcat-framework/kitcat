@@ -2,9 +2,9 @@ package kitmail
 
 import (
 	"context"
-	"github.com/expectedsh/kitcat"
-	"github.com/expectedsh/kitcat/kitdi"
-	"github.com/expectedsh/kitcat/kitslog"
+	"github.com/kitcat-framework/kitcat"
+	"github.com/kitcat-framework/kitcat/kitdi"
+	"github.com/kitcat-framework/kitcat/kitslog"
 	"github.com/spf13/viper"
 	"log/slog"
 )

@@ -1,4 +1,4 @@
-module github.com/expectedsh/kitcat
+module github.com/kitcat-framework/kitcat
 
 go 1.21.2
 

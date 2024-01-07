@@ -3,8 +3,8 @@ package kitstorage
 import (
 	"context"
 	"github.com/expectedsh/dig"
-	"github.com/expectedsh/kitcat"
-	"github.com/expectedsh/kitcat/kitdi"
+	"github.com/kitcat-framework/kitcat"
+	"github.com/kitcat-framework/kitcat/kitdi"
 	"io"
 )
 

@@ -3,7 +3,7 @@ package kitweb
 import (
 	"context"
 	"errors"
-	"github.com/expectedsh/kitcat/kittemplate"
+	"github.com/kitcat-framework/kitcat/kittemplate"
 	"net/http"
 )
 

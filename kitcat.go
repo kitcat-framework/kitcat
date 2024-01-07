@@ -4,7 +4,7 @@ import (
 	"context"
 	"fmt"
 	"github.com/expectedsh/dig"
-	"github.com/expectedsh/kitcat/kitdi"
+	"github.com/kitcat-framework/kitcat/kitdi"
 	"github.com/mitchellh/mapstructure"
 	"github.com/spf13/viper"
 )

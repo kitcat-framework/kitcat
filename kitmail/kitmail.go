@@ -2,8 +2,8 @@ package kitmail
 
 import (
 	"github.com/expectedsh/dig"
-	"github.com/expectedsh/kitcat/kitdi"
 	jemail "github.com/jordan-wright/email"
+	"github.com/kitcat-framework/kitcat/kitdi"
 )
 
 type (

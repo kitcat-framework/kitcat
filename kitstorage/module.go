@@ -3,10 +3,10 @@ package kitstorage
 import (
 	"context"
 	"fmt"
-	"github.com/expectedsh/kitcat"
-	"github.com/expectedsh/kitcat/kitdi"
-	"github.com/expectedsh/kitcat/kitslog"
-	"github.com/expectedsh/kitcat/kitweb"
+	"github.com/kitcat-framework/kitcat"
+	"github.com/kitcat-framework/kitcat/kitdi"
+	"github.com/kitcat-framework/kitcat/kitslog"
+	"github.com/kitcat-framework/kitcat/kitweb"
 	"github.com/spf13/viper"
 	"log/slog"
 )

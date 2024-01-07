@@ -1,6 +1,6 @@
 package kitweb
 
-import "github.com/expectedsh/kitcat/kitweb/httpbind"
+import "github.com/kitcat-framework/kitcat/kitweb/httpbind"
 
 var GetParamsBinder = getDefaultParamsBinder
 

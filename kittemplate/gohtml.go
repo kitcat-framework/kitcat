@@ -3,7 +3,7 @@ package kittemplate
 import (
 	"fmt"
 	"github.com/Masterminds/sprig/v3"
-	"github.com/expectedsh/kitcat"
+	"github.com/kitcat-framework/kitcat"
 	"github.com/spf13/viper"
 	"html/template"
 	"io"

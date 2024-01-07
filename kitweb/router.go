@@ -1,9 +1,9 @@
 package kitweb
 
 import (
-	"github.com/expectedsh/kitcat"
-	"github.com/expectedsh/kitcat/kitslog"
 	"github.com/gorilla/mux"
+	"github.com/kitcat-framework/kitcat"
+	"github.com/kitcat-framework/kitcat/kitslog"
 	"log/slog"
 	"net/http"
 	"os"

@@ -3,7 +3,7 @@ package kitweb
 import (
 	_ "embed"
 	"errors"
-	"github.com/expectedsh/kitcat"
+	"github.com/kitcat-framework/kitcat"
 	"html/template"
 	"net/http"
 	"strings"
