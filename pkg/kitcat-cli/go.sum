@@ -24,8 +24,8 @@ github.com/docker/go-connections v0.4.0 h1:El9xVISelRB7BuFusrZozjnkIM5YnzCViNKoh
 github.com/docker/go-connections v0.4.0/go.mod h1:Gbd7IOopHjR8Iph03tsViu4nIes5XhDvyHbTtUxmeec=
 github.com/docker/go-units v0.5.0 h1:69rxXcBk27SvSaaxTtLh/8llcHD8vYHT7WSdRZ/jvr4=
 github.com/docker/go-units v0.5.0/go.mod h1:fgPhTUdO+D/Jk86RDLlptpiXQzgHJF7gydDDbaIK4Dk=
-github.com/expectedsh/dig v0.0.1-expected h1:9E1CxIFWjjmkPwslEJgIiMBGW805JNrBTBq1VqiDrMA=
-github.com/expectedsh/dig v0.0.1-expected/go.mod h1:TlTW0Xtcx4YY6J6vp9sFGQPDDxCUC7UJIwUOfieEM8g=
+go.uber.org/dig v0.0.1-expected h1:9E1CxIFWjjmkPwslEJgIiMBGW805JNrBTBq1VqiDrMA=
+go.uber.org/dig v0.0.1-expected/go.mod h1:TlTW0Xtcx4YY6J6vp9sFGQPDDxCUC7UJIwUOfieEM8g=
 github.com/go-sql-driver/mysql v1.7.0 h1:ueSltNNllEqE3qcWBTD0iQd3IpL/6U+mJxLkazJ7YPc=
 github.com/go-sql-driver/mysql v1.7.0/go.mod h1:OXbVy3sEdcQ2Doequ6Z5BW6fXNQTmx+9S1MCJN5yJMI=
 github.com/golang-sql/civil v0.0.0-20220223132316-b832511892a9 h1:au07oEsX2xN0ktxqI+Sida1w446QrXBRJ0nee3SNZlA=

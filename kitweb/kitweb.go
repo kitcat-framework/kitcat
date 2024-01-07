@@ -2,9 +2,9 @@ package kitweb
 
 import (
 	"context"
-	"github.com/expectedsh/dig"
 	"github.com/kitcat-framework/kitcat"
 	"github.com/kitcat-framework/kitcat/kitdi"
+	"go.uber.org/dig"
 	"net/http"
 )
 

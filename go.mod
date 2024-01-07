@@ -6,7 +6,6 @@ require (
 	github.com/Masterminds/sprig/v3 v3.2.3
 	github.com/charmbracelet/lipgloss v0.9.1
 	github.com/dgraph-io/ristretto v0.1.1
-	github.com/expectedsh/dig v0.0.1-expected
 	github.com/go-playground/locales v0.14.1
 	github.com/go-playground/universal-translator v0.18.1
 	github.com/go-playground/validator/v10 v10.15.5
@@ -17,6 +16,7 @@ require (
 	github.com/samber/lo v1.38.1
 	github.com/sourcegraph/go-diff-patch v0.0.0-20220818153721-50706a0e22c3
 	github.com/spf13/viper v1.17.0
+	go.uber.org/dig v1.17.1
 )
 
 // test dependencies

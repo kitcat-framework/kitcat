@@ -1,7 +1,7 @@
 package commands
 
 import (
-	"github.com/expectedsh/kitcat/pkg/kitcat-cli/utils"
+	"github.com/kitcat-framework/kitcat/pkg/kitcat-cli/utils"
 	"github.com/mkideal/cli"
 	"strings"
 )

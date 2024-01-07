@@ -2,7 +2,7 @@ package main
 
 import (
 	"fmt"
-	"github.com/expectedsh/kitcat/pkg/kitcat-cli/commands"
+	"github.com/kitcat-framework/kitcat/pkg/kitcat-cli/commands"
 	"github.com/mkideal/cli"
 	"os"
 )

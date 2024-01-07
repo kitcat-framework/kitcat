@@ -2,7 +2,7 @@ package kitdi
 
 import (
 	"errors"
-	"github.com/expectedsh/dig"
+	"go.uber.org/dig"
 	"reflect"
 )
 

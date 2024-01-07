@@ -3,8 +3,8 @@ package kitpg
 import (
 	"context"
 	"fmt"
-	"github.com/expectedsh/kitcat"
-	"github.com/expectedsh/kitcat/kitevent"
+	"github.com/kitcat-framework/kitcat"
+	"github.com/kitcat-framework/kitcat/kitevent"
 	"github.com/kitcat-framework/kitcat/pkg/kitpg/kiteventpg"
 	"github.com/spf13/viper"
 	"gorm.io/driver/postgres"

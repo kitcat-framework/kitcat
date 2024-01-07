@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"github.com/compose-spec/compose-go/loader"
 	"github.com/compose-spec/compose-go/types"
-	"github.com/expectedsh/kitcat/pkg/kitcat-cli/utils"
+	"github.com/kitcat-framework/kitcat/pkg/kitcat-cli/utils"
 	"github.com/mkideal/cli"
 	"gopkg.in/yaml.v3"
 	"os"

@@ -2,8 +2,8 @@ package kitdi
 
 import (
 	"fmt"
-	"github.com/expectedsh/dig"
 	"github.com/stretchr/testify/require"
+	"go.uber.org/dig"
 	"testing"
 )
 

@@ -1,5 +1,5 @@
 github.com/davecgh/go-spew v1.1.0/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=
-github.com/expectedsh/dig v0.0.1-expected/go.mod h1:TlTW0Xtcx4YY6J6vp9sFGQPDDxCUC7UJIwUOfieEM8g=
+go.uber.org/dig v0.0.1-expected/go.mod h1:TlTW0Xtcx4YY6J6vp9sFGQPDDxCUC7UJIwUOfieEM8g=
 github.com/jackc/pgpassfile v1.0.0/go.mod h1:CEx0iS5ambNFdcRtxPj5JhEz+xB6uRky5eyVu/W2HEg=
 github.com/jackc/pgservicefile v0.0.0-20221227161230-091c0ba34f0a/go.mod h1:5TJZWKEWniPve33vlWYSoGYefn3gLQRzjfDlhSJ9ZKM=
 github.com/jackc/pgx/v5 v5.4.3/go.mod h1:Ig06C2Vu0t5qXC60W8sqIthScaEnFvojjj9dSljmHRA=

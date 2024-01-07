@@ -4,9 +4,9 @@ go 1.21.2
 
 require (
 	dario.cat/mergo v1.0.0
-	github.com/kitcat-framework/kitcat v0.0.0
 	github.com/golang-migrate/migrate/v4 v4.17.0
 	github.com/jackc/pgx/v5 v5.4.3
+	github.com/kitcat-framework/kitcat v0.0.0
 	github.com/lib/pq v1.10.9
 	github.com/samber/lo v1.38.1
 	github.com/spf13/viper v1.17.0
@@ -16,7 +16,6 @@ require (
 )
 
 require (
-	github.com/expectedsh/dig v0.0.1-expected // indirect
 	github.com/fsnotify/fsnotify v1.6.0 // indirect
 	github.com/go-sql-driver/mysql v1.7.0 // indirect
 	github.com/google/uuid v1.4.0 // indirect
@@ -39,6 +38,7 @@ require (
 	github.com/spf13/pflag v1.0.5 // indirect
 	github.com/subosito/gotenv v1.6.0 // indirect
 	go.uber.org/atomic v1.9.0 // indirect
+	go.uber.org/dig v1.17.1 // indirect
 	go.uber.org/multierr v1.9.0 // indirect
 	golang.org/x/crypto v0.17.0 // indirect
 	golang.org/x/exp v0.0.0-20230905200255-921286631fa9 // indirect

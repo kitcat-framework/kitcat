@@ -2,11 +2,11 @@ package kitevent
 
 import (
 	"context"
-	"github.com/expectedsh/dig"
 	"github.com/google/uuid"
 	"github.com/kitcat-framework/kitcat"
 	"github.com/kitcat-framework/kitcat/kitdi"
 	"github.com/samber/lo"
+	"go.uber.org/dig"
 	"time"
 )
 

@@ -3,8 +3,8 @@ package kitsqlite
 import (
 	"context"
 	"fmt"
-	"github.com/expectedsh/kitcat"
-	"github.com/expectedsh/kitcat/kitdi"
+	"github.com/kitcat-framework/kitcat"
+	"github.com/kitcat-framework/kitcat/kitdi"
 	"github.com/spf13/viper"
 	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"

@@ -1,21 +1,21 @@
-module github.com/expectedsh/kitcat/pkg/kitcat-cli
+module github.com/kitcat-framework/kitcat/pkg/kitcat-cli
 
 go 1.21.2
 
-replace github.com/expectedsh/kitcat/pkg/kitsqlite => ../kitsqlite
+replace github.com/kitcat-framework/kitcat/pkg/kitsqlite => ../kitsqlite
 
-replace github.com/expectedsh/kitcat/pkg/kitpg => ../kitpg
+replace github.com/kitcat-framework/kitcat/pkg/kitpg => ../kitpg
 
-replace github.com/expectedsh/kitcat => ../../
+replace github.com/kitcat-framework/kitcat => ../../
 
 require (
 	github.com/charmbracelet/bubbles v0.16.1
 	github.com/charmbracelet/bubbletea v0.24.2
 	github.com/charmbracelet/lipgloss v0.9.1
 	github.com/compose-spec/compose-go v1.20.0
-	github.com/expectedsh/kitcat v0.0.0
-	github.com/expectedsh/kitcat/pkg/kitpg v0.0.0-00010101000000-000000000000
-	github.com/expectedsh/kitcat/pkg/kitsqlite v0.0.0-00010101000000-000000000000
+	github.com/kitcat-framework/kitcat v0.0.0
+	github.com/kitcat-framework/kitcat/pkg/kitpg v0.0.0-00010101000000-000000000000
+	github.com/kitcat-framework/kitcat/pkg/kitsqlite v0.0.0-00010101000000-000000000000
 	github.com/hashicorp/go-envparse v0.1.0
 	github.com/labstack/gommon v0.3.0
 	github.com/mkideal/cli v0.2.7
@@ -31,7 +31,7 @@ require (
 	github.com/distribution/reference v0.5.0 // indirect
 	github.com/docker/go-connections v0.4.0 // indirect
 	github.com/docker/go-units v0.5.0 // indirect
-	github.com/expectedsh/dig v0.0.1-expected // indirect
+	go.uber.org/dig v0.0.1-expected // indirect
 	github.com/go-sql-driver/mysql v1.7.0 // indirect
 	github.com/google/uuid v1.4.0 // indirect
 	github.com/imdario/mergo v0.3.16 // indirect

@@ -3,9 +3,9 @@ package kitcache
 import (
 	"fmt"
 	"github.com/dgraph-io/ristretto"
-	"github.com/expectedsh/dig"
 	"github.com/kitcat-framework/kitcat"
 	"github.com/spf13/viper"
+	"go.uber.org/dig"
 )
 
 type InMemoryStoreConfig struct {

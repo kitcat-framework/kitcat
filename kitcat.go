@@ -3,10 +3,10 @@ package kitcat
 import (
 	"context"
 	"fmt"
-	"github.com/expectedsh/dig"
 	"github.com/kitcat-framework/kitcat/kitdi"
 	"github.com/mitchellh/mapstructure"
 	"github.com/spf13/viper"
+	"go.uber.org/dig"
 )
 
 type (
