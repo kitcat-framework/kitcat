@@ -1,9 +1,9 @@
-module github.com/expectedsh/kitcat/pkg/kitsqlite
+module github.com/kitcat-framework/kitcat/pkg/kitsqlite
 
 go 1.21.2
 
 require (
-	github.com/expectedsh/kitcat v0.0.0
+	github.com/kitcat-framework/kitcat v0.0.0
 	gorm.io/driver/sqlite v1.5.4
 	gorm.io/gorm v1.25.4
 )
@@ -15,4 +15,4 @@ require (
 	github.com/mattn/go-sqlite3 v1.14.17 // indirect
 )
 
-replace github.com/expectedsh/kitcat => ../../
+replace github.com/kitcat-framework/kitcat => ../../

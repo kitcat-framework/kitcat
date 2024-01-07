@@ -1,10 +1,10 @@
-module github.com/expectedsh/kitcat/pkg/kitpg
+module github.com/kitcat-framework/kitcat/pkg/kitpg
 
 go 1.21.2
 
 require (
 	dario.cat/mergo v1.0.0
-	github.com/expectedsh/kitcat v0.0.0
+	github.com/kitcat-framework/kitcat v0.0.0
 	github.com/golang-migrate/migrate/v4 v4.17.0
 	github.com/jackc/pgx/v5 v5.4.3
 	github.com/lib/pq v1.10.9
@@ -49,4 +49,4 @@ require (
 	gorm.io/driver/mysql v1.4.7 // indirect
 )
 
-replace github.com/expectedsh/kitcat => ../../
+replace github.com/kitcat-framework/kitcat => ../../

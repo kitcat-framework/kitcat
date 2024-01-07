@@ -1,9 +1,9 @@
-module github.com/expectedsh/kitcat/pkg/kittx
+module github.com/kitcat-framework/kitcat/pkg/kittx
 
 go 1.21.2
 
 require (
-	github.com/expectedsh/kitcat v0.0.0
+	github.com/kitcat-framework/kitcat v0.0.0
 	gorm.io/gorm v1.25.4
 )
 
@@ -18,4 +18,4 @@ require (
 	golang.org/x/text v0.13.0 // indirect
 )
 
-replace github.com/expectedsh/kitcat => ../../
+replace github.com/kitcat-framework/kitcat => ../../

@@ -3,8 +3,8 @@ package kiteventpg
 import (
 	"dario.cat/mergo"
 	"fmt"
-	"github.com/expectedsh/kitcat/pkg/kitpg/pgutils"
 	"github.com/jackc/pgx/v5/pgtype"
+	"github.com/kitcat-framework/kitcat/pkg/kitpg/pgutils"
 	"gorm.io/datatypes"
 	"time"
 )
