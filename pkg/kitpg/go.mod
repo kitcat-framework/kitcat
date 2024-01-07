@@ -6,7 +6,7 @@ require (
 	dario.cat/mergo v1.0.0
 	github.com/golang-migrate/migrate/v4 v4.17.0
 	github.com/jackc/pgx/v5 v5.4.3
-	github.com/kitcat-framework/kitcat v0.0.0
+	github.com/kitcat-framework/kitcat v0.0.0-20240107215653-1fb93e4d740b
 	github.com/lib/pq v1.10.9
 	github.com/samber/lo v1.38.1
 	github.com/spf13/viper v1.17.0
