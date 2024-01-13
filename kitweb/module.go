@@ -98,7 +98,7 @@ func (c *Config) InitConfig(prefix string) kitcat.ConfigUnmarshal {
 	viper.SetDefault(prefix+".idle_timeout", 0)
 	viper.SetDefault(prefix+".max_header_bytes", 0)
 	viper.SetDefault(prefix+".template_engine_name", "gohtml")
-	viper.SetDefault(prefix+".public_folder", "public")
+	viper.SetDefault(prefix+".public_folder", "views/public")
 	viper.SetDefault(prefix+".public_path", "/public/")
 
 	c.PanicHandler = panicHandler

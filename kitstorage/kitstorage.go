@@ -6,6 +6,7 @@ import (
 	"github.com/kitcat-framework/kitcat/kitdi"
 	"go.uber.org/dig"
 	"io"
+	"time"
 )
 
 type (
@@ -14,7 +15,7 @@ type (
 		Get(ctx context.Context, path string) (io.Reader, error)
 		Exists(ctx context.Context, path string) (bool, error)
 		Delete(ctx context.Context, path string) error
-		GetURL(ctx context.Context, path string) (string, error)
+		GetURL(ctx context.Context, path string, opts ...GetURLOptionFunc) (string, error)
 		ListFiles(ctx context.Context, path string, recursive bool) ([]string, error)
 
 		kitcat.Nameable
@@ -23,16 +24,17 @@ type (
 	PutOptions struct {
 		options map[string]any
 
-		public bool
+		Public bool
 	}
 
 	PutOptionFunc func(*PutOptions)
 
-	GetURLOptions struct {
-		options map[string]any
-	}
-
 	GetURLOptionFunc func(*GetURLOptions)
+
+	GetURLOptions struct {
+		PreSign    bool
+		Expiration *time.Duration
+	}
 
 	fileSystems struct {
 		dig.In
@@ -51,6 +53,22 @@ func NewPutOptions() *PutOptions {
 	}
 }
 
+func NewGetURLOptions() *GetURLOptions {
+	return &GetURLOptions{
+		PreSign: false,
+	}
+}
+
 var PutOptionPublic = func(o *PutOptions) {
-	o.public = true
+	o.Public = true
+}
+
+var GetURLOptionPreSign = func(o *GetURLOptions) {
+	o.PreSign = true
+}
+
+func GetURLOptionExpiration(d time.Duration) GetURLOptionFunc {
+	return func(o *GetURLOptions) {
+		o.Expiration = &d
+	}
 }

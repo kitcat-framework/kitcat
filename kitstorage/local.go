@@ -84,7 +84,7 @@ func (l LocalFileSystem) Put(_ context.Context, path string, reader io.Reader, o
 		opt(putOptions)
 	}
 
-	fmd := fileMetadata{Public: putOptions.public}
+	fmd := fileMetadata{Public: putOptions.Public}
 
 	fullPath := filepath.Join(l.Config.BasePath, path)
 	fmt.Println(fullPath)
@@ -128,7 +128,7 @@ func (l LocalFileSystem) Delete(_ context.Context, path string) error {
 	return os.Remove(fullPath)
 }
 
-func (l LocalFileSystem) GetURL(_ context.Context, path string) (string, error) {
+func (l LocalFileSystem) GetURL(_ context.Context, path string, _ ...GetURLOptionFunc) (string, error) {
 	return fmt.Sprintf("http://%s/%s", l.appConfig.Host, filepath.Join(l.Config.BasePath, path)), nil
 }
 
@@ -207,7 +207,7 @@ func (l LocalFileSystem) Routes(r *kitweb.Router) {
 		filePath := filepath.Join(l.Config.BasePath, pathWithoutPrefix)
 		meta := l.filesMetadata[filePath]
 
-		// check if the file is public or if the request is for the file metadata
+		// check if the file is Public or if the request is for the file metadata
 		if !meta.Public || filePath == l.filePathFileMetadata {
 			http.NotFound(w, r)
 			return

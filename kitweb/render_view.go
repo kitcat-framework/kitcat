@@ -5,6 +5,7 @@ import (
 	"errors"
 	"github.com/kitcat-framework/kitcat/kittemplate"
 	"net/http"
+	"reflect"
 )
 
 type RenderViewBuilder struct {
@@ -44,13 +45,31 @@ func (r *RenderViewBuilder) Layout(layout string) *RenderViewBuilder {
 	return r
 }
 
-// RenderData is the data passed to the template engine
-//
-// Data is any because anyway even jetbrain auto completion can't help you with generics type...
 type RenderData struct {
 	Data any
+	Err  error
+}
 
-	Err error
+// SetRenderData set the RenderData field of dest with rd.
+func SetRenderData(dest any, rd RenderData) {
+	// safe do that :
+	//reflect.ValueOf(dest).Elem().FieldByName("RenderData").Set(reflect.ValueOf(rd))
+
+	val := reflect.ValueOf(dest)
+
+	if val.Kind() == reflect.Ptr {
+		val = val.Elem()
+	}
+
+	if !val.FieldByName("RenderData").IsValid() {
+		return
+	}
+
+	if val.FieldByName("RenderData").Type() != reflect.TypeOf(rd) {
+		return
+	}
+
+	val.FieldByName("RenderData").Set(reflect.ValueOf(rd))
 }
 
 func (r RenderData) Error() (*Err, bool) {

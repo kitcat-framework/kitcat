@@ -40,9 +40,9 @@ type GoHTMLEngineConfig struct {
 func (c *GoHTMLEngineConfig) InitConfig(prefix string) kitcat.ConfigUnmarshal {
 	prefix = prefix + ".kittemplate.template_engines.gohtml"
 
-	viper.SetDefault(prefix+".folder", "templates")
-	viper.SetDefault(prefix+".layouts_folder", "layouts")
-	viper.SetDefault(prefix+".partials_folder", "partials")
+	viper.SetDefault(prefix+".folder", "views/templates")
+	viper.SetDefault(prefix+".layouts_folder", "views/layouts")
+	viper.SetDefault(prefix+".partials_folder", "views/partials")
 
 	return kitcat.ConfigUnmarshalHandler(prefix, c, "unable to unmarshal gohtml template config: %w")
 }

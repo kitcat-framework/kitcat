@@ -31,6 +31,11 @@ type AppConfig struct {
 	LoggerOutput     string        `cfg:"_logger_output"`
 	HooksMaxLifetime time.Duration `cfg:"_hooks_max_lifetime"`
 	Host             string        `cfg:"host"`
+	UrlProtocol      string        `cfg:"url_protocol"`
+}
+
+func (c *AppConfig) AppURL() string {
+	return fmt.Sprintf("%s%s", c.UrlProtocol, c.Host)
 }
 
 func (c *AppConfig) InitConfig(prefix string) ConfigUnmarshal {
@@ -40,6 +45,7 @@ func (c *AppConfig) InitConfig(prefix string) ConfigUnmarshal {
 
 	prefix = prefix + ".kitcat"
 	viper.SetDefault(prefix+".host", "localhost:8080")
+	viper.SetDefault(prefix+".url_protocol", "http://")
 
 	return func() error {
 		err := viper.Unmarshal(c, func(config *mapstructure.DecoderConfig) {

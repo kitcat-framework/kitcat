@@ -65,7 +65,8 @@ func notFoundHandler(rw http.ResponseWriter, req *http.Request, _ error) {
 	contentType := req.Header.Get("Content-Type")
 
 	if strings.Contains(contentType, "application/json") {
-		_ = JSONRender().Err(NotFoundError(errors.New("not found"))).StatusCode(http.StatusNotFound).Write(req.Context(),
+		_ = JSONRender().Err(NotFoundError(Error("not_found", "page not found",
+			errors.New("not found")))).StatusCode(http.StatusNotFound).Write(req.Context(),
 			rw)
 	} else {
 		rw.WriteHeader(http.StatusNotFound)

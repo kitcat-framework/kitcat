@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"github.com/kitcat-framework/kitcat"
 	"net/http"
 )
 
@@ -27,13 +28,15 @@ func (r *RenderJSONBuilder) Data(data any) *RenderJSONBuilder {
 	return r
 }
 
-func (r *RenderJSONBuilder) Write(_ context.Context, w http.ResponseWriter) error {
+func (r *RenderJSONBuilder) Write(ctx context.Context, w http.ResponseWriter) error {
 	response := make(map[string]any)
 
 	var (
 		ve  ValidationError
 		err *Err
 	)
+
+	env := ctx.Value(ContextKeyEnv).(*kitcat.Environment)
 
 	if errors.As(r.error, &ve) {
 		response["errors"] = ve.Errors
@@ -47,6 +50,10 @@ func (r *RenderJSONBuilder) Write(_ context.Context, w http.ResponseWriter) erro
 
 		if err.Meta != nil {
 			response["meta"] = err.Meta
+		}
+
+		if !env.Equal(kitcat.EnvironmentProduction) && err.error != nil {
+			response["origin_error"] = err.Error()
 		}
 	} else if r.error != nil {
 		response["error"] = InternalError(r.error)
